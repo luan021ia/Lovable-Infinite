@@ -1,0 +1,28 @@
+{
+    "name": "license-validation-api",
+    "version": "1.0.0",
+    "description": "API para validação de chaves de licença da extensão Lovable Assistant",
+    "main": "api-example.js",
+    "scripts": {
+        "start": "node api-example.js",
+        "dev": "nodemon api-example.js"
+    },
+    "keywords": [
+        "license",
+        "validation",
+        "api",
+        "chrome-extension"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "express": "^4.18.2",
+        "cors": "^2.8.5"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.1"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    }
+}

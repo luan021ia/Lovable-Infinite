@@ -1,0 +1,48 @@
+{
+    "manifest_version": 3,
+    "name": "Lovable Infinity",
+    "version": "3.1",
+    "description": "Gere prompts infinitos e ilimitados.",
+    "permissions": [
+        "activeTab",
+        "scripting",
+        "sidePanel",
+        "storage",
+        "system.cpu",
+        "webRequest"
+    ],
+    "host_permissions": [
+        "https://lovable.dev/*",
+        "https://api.lovable.dev/*",
+        "*://*/*"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "side_panel": {
+        "default_path": "popup.html"
+    },
+    "action": {
+        "default_icon": {
+            "16": "ICONS/icon.png",
+            "48": "ICONS/icon.png",
+            "128": "ICONS/icon.png"
+        }
+    },
+    "icons": {
+        "16": "ICONS/icon.png",
+        "48": "ICONS/icon.png",
+        "128": "ICONS/icon.png"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://lovable.dev/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_start"
+        }
+    ]
+}

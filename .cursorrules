@@ -1,0 +1,6 @@
+# Master Lovable Infinity - Regras do projeto
+
+## Deploy automático (produção)
+- O projeto está em **produção**. Toda alteração relevante (admin, extensão, firebase-config, styles, etc.) deve ser seguida de **deploy automático** no Firebase Hosting.
+- Após editar arquivos do projeto, executar: `firebase deploy --only hosting` (na pasta do projeto).
+- Comando no PowerShell: `cd "c:\Users\luan9\Downloads\Master_Lovable_Infinity"; firebase deploy --only hosting`

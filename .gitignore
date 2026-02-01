@@ -1,0 +1,37 @@
+# ============================================
+# GITIGNORE - EXTENSÃO CHROME
+# ============================================
+
+# Versão ofuscada (não commitar código ofuscado)
+obfuscated/
+
+# Node modules (se usar)
+node_modules/
+
+# Logs
+*.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporários
+*.tmp
+temp/
+.cache/
+
+# Backups
+*.backup
+backup/
+
+# Arquivos de build
+dist/
+build/

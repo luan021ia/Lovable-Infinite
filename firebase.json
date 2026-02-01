@@ -1,0 +1,19 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "docs/**",
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/.cursor/**",
+      "**/.vscode/**",
+      "*.bat",
+      "package-lock.json",
+      "DEPLOY.md",
+      ".gitignore",
+      "obfuscar.bat",
+      "mock-extension.js"
+    ]
+  }
+}

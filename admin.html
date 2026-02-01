@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Admin - Lovable Infinity</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            width: 100%;
+            min-height: 100vh;
+            max-height: none;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .admin-header {
+            margin-bottom: 40px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 20px;
+        }
+
+        .admin-header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--accent-light), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .admin-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            background: rgba(20, 24, 41, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+        }
+
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .license-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .license-table th {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .license-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        .license-table tr:hover {
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .status-badge-small {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #86efac;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #86efac;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .license-key {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            word-break: break-all;
+            user-select: all;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn-small {
+            padding: 6px 12px;
+            font-size: 11px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--border);
+            color: var(--accent);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn-small:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .action-btn-small.delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .action-btn-small.delete:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: rgba(20, 24, 41, 0.95);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+        }
+
+        .btn-secondary {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--accent);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 30px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Modal: só senha -->
+    <div id="password-modal" class="modal show">
+        <div class="modal-content">
+            <div class="modal-header" style="margin-bottom: 30px;">Painel Protegido</div>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">Digite a senha do admin:</p>
+            <div class="form-group">
+                <input type="password" id="access-password" placeholder="Senha" autocomplete="current-password" style="margin-bottom: 20px;">
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" id="btn-verify-password">Acessar</button>
+                <button class="btn btn-secondary" id="btn-close-panel">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-container">
+        <!-- Header -->
+        <div class="admin-header">
+            <h1>🔐 Painel de Administração</h1>
+            <p style="color: var(--text-secondary); font-size: 14px;">Lovable Infinity - Gerenciamento de Licenças</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="admin-tabs">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="generate">Gerar Licença</button>
+            <button class="tab-btn" data-tab="manage">Gerenciar</button>
+            <button class="tab-btn" data-tab="settings">Configurações</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid" id="stats-grid"></div>
+            <div class="section">
+                <h2>Licenças Ativas</h2>
+                <table class="license-table">
+                    <thead>
+                        <tr>
+                            <th>Chave</th>
+                            <th>Status</th>
+                            <th>Ativada</th>
+                            <th>Expiração</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="licenses-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Generate Tab -->
+        <div id="generate" class="tab-content">
+            <div class="section">
+                <h2>Gerar Nova Licença</h2>
+                <div class="alert" id="alert-generate"></div>
+
+                <div class="form-group">
+                    <label>Nome do Usuário</label>
+                    <input type="text" id="user-name" placeholder="Ex: João Silva">
+                </div>
+
+                <div class="form-group">
+                    <label>Telefone do Usuário</label>
+                    <input type="tel" id="user-phone" placeholder="Ex: (11) 99999-9999">
+                </div>
+
+                <div class="form-group">
+                    <label>Dias de Validade</label>
+                    <input type="number" id="expiry-days" value="30" min="1" max="365">
+                </div>
+
+                <div class="form-group">
+                    <label>Limite de Usos (deixe em branco para ilimitado)</label>
+                    <input type="number" id="max-uses" placeholder="Ex: 100">
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" id="btn-generate">Gerar Licença</button>
+                </div>
+
+                <div id="generated-license" style="display: none; margin-top: 20px;">
+                    <div class="form-group">
+                        <label>Licença Gerada</label>
+                        <div class="license-key" id="new-license-key"></div>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-copy-generated">Copiar Licença</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage Tab -->
+        <div id="manage" class="tab-content">
+            <div class="section">
+                <h2>Gerenciar Licenças</h2>
+                <table class="license-table">
+                    <thead>
+                        <tr>
+                            <th>Chave</th>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th>Status</th>
+                            <th>Ativada</th>
+                            <th>Criada</th>
+                            <th>Expiração</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="manage-tbody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section">
+                <h2>Importar/Exportar</h2>
+                <div class="form-group">
+                    <label>Exportar Licenças (JSON)</label>
+                    <textarea id="export-textarea" readonly style="height: 150px;"></textarea>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" id="btn-export">Exportar</button>
+                    <button class="btn btn-secondary" id="btn-copy-export">Copiar JSON</button>
+                </div>
+
+                <div class="form-group" style="margin-top: 20px;">
+                    <label>Importar Licenças (JSON)</label>
+                    <textarea id="import-textarea" placeholder="Cole o JSON aqui..." style="height: 150px;"></textarea>
+                </div>
+                <button class="btn btn-primary" id="btn-import">Importar</button>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="section">
+                <h2>Configurações de Admin</h2>
+                <div class="alert" id="alert-settings"></div>
+
+                <div class="form-group">
+                    <label>Nova senha do Admin</label>
+                    <input type="password" id="admin-password" placeholder="Digite uma senha segura (mín. 6 caracteres)">
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" id="btn-set-password">Definir senha</button>
+                </div>
+
+                <hr>
+
+                <h2>Sincronização com Nuvem</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 15px;">Sincronize suas licenças com Firebase para funcionar em múltiplos computadores</p>
+                <div class="button-group">
+                    <button class="btn btn-primary" id="btn-sync-firebase">Sincronizar com Firebase</button>
+                    <button class="btn btn-secondary" id="btn-test-firebase">Testar Conexão</button>
+                </div>
+                <div id="firebase-status" style="margin-top: 15px; padding: 10px; border-radius: 8px; background: rgba(100, 200, 100, 0.1); color: var(--text-secondary); display: none;"></div>
+
+                <hr>
+
+                <h2>Dados</h2>
+                <div class="button-group">
+                    <button class="btn btn-danger" id="btn-clear-all">Limpar Todas as Licenças</button>
+                    <button class="btn btn-secondary" id="btn-close">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">×</button>
+            <div class="modal-header" id="modal-title"></div>
+            <p id="modal-message" style="color: var(--text-secondary); margin-bottom: 20px;"></p>
+            <div class="button-group">
+                <button class="btn btn-primary" id="btn-confirm">Confirmar</button>
+                <button class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Config (sem SDK externo, usa REST API) -->
+    <script src="firebase-config.js"></script>
+    <script src="license-manager.js"></script>
+    <script src="admin.js"></script>
+</body>
+
+</html>
