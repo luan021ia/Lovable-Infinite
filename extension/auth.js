@@ -93,12 +93,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (result.valid) {
             showSuccess(result.message);
 
-            // Salvar chave e status de autenticação
+            // Guardar device e URL do Firebase para o background fazer ping de sessão
+            const deviceFingerprint = await getDeviceFingerprint();
+            const firebaseDatabaseURL = (typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL) ? FIREBASE_CONFIG.databaseURL : '';
+
+            // Salvar chave, status, expiração e vitalício (para exibir no popup)
+            const userData = { ...(result.userData || {}) };
+            if (result.license) {
+                if (result.license.expiryDate) userData.expiryDate = result.license.expiryDate;
+                if (result.license.lifetime === true) userData.lifetime = true;
+            }
+
             await chrome.storage.local.set({
                 licenseKey: key,
                 isAuthenticated: true,
                 authTimestamp: new Date().toISOString(),
-                userData: result.userData || {}
+                userData,
+                deviceFingerprint: deviceFingerprint,
+                firebaseDatabaseURL: firebaseDatabaseURL
             });
 
             // Redirecionar para a página principal após 1 segundo

@@ -5,6 +5,7 @@
     "description": "Gere prompts infinitos e ilimitados.",
     "permissions": [
         "activeTab",
+        "alarms",
         "scripting",
         "sidePanel",
         "storage",

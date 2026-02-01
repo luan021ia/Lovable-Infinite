@@ -36,10 +36,13 @@ async function syncSidePanelForAllTabs() {
     }
 }
 
-// Ao instalar/atualizar: aplicar regra para todas as abas atuais
+// Ao instalar/atualizar: aplicar regra para todas as abas atuais e alarme de sessão se já tiver licença
 chrome.runtime.onInstalled.addListener(async () => {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => console.warn('[Background] setPanelBehavior onInstalled:', err));
     await syncSidePanelForAllTabs();
+    chrome.storage.local.get(['licenseKey', 'deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
+        if (d.licenseKey && d.deviceFingerprint && d.firebaseDatabaseURL) startSessionPingAlarm();
+    });
 });
 
 // Ao iniciar o navegador: garantir que abas já abertas respeitem a regra
@@ -62,6 +65,64 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         const tab = await chrome.tabs.get(activeInfo.tabId);
         updateSidePanelForTab(tab.id, tab.url);
     } catch (_) { /* aba fechada */ }
+});
+
+// ========== UMA SESSÃO ATIVA POR LICENÇA (heartbeat) ==========
+const SESSION_PING_ALARM = 'sessionPing';
+const SESSION_PING_MINUTES = 5;
+
+function startSessionPingAlarm() {
+    chrome.alarms.create(SESSION_PING_ALARM, { periodInMinutes: SESSION_PING_MINUTES });
+    console.log('[Background] Alarm sessionPing criado (a cada', SESSION_PING_MINUTES, 'min)');
+}
+
+function stopSessionPingAlarm() {
+    chrome.alarms.clear(SESSION_PING_ALARM);
+    console.log('[Background] Alarm sessionPing removido');
+}
+
+async function pingLicenseSession(licenseKey, deviceFingerprint, firebaseDatabaseURL) {
+    if (!licenseKey || !deviceFingerprint || !firebaseDatabaseURL) return;
+    const url = firebaseDatabaseURL.replace(/\/$/, '') + '/licenses/' + encodeURIComponent(licenseKey) + '.json';
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data || !data.key) return;
+        const updated = { ...data, activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() }, timestamp: new Date().toISOString() };
+        const putRes = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+        if (putRes.ok) console.log('[Background] Sessão ping OK');
+    } catch (e) {
+        console.warn('[Background] Ping sessão:', e);
+    }
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (changes.licenseKey) {
+        if (changes.licenseKey.newValue) {
+            chrome.storage.local.get(['deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
+                if (d.deviceFingerprint && d.firebaseDatabaseURL) startSessionPingAlarm();
+            });
+        } else {
+            stopSessionPingAlarm();
+        }
+    }
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== SESSION_PING_ALARM) return;
+    chrome.storage.local.get(['licenseKey', 'deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
+        if (d.licenseKey && d.deviceFingerprint && d.firebaseDatabaseURL) {
+            pingLicenseSession(d.licenseKey, d.deviceFingerprint, d.firebaseDatabaseURL);
+        }
+    });
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    chrome.storage.local.get(['licenseKey', 'deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
+        if (d.licenseKey && d.deviceFingerprint && d.firebaseDatabaseURL) startSessionPingAlarm();
+    });
 });
 
 // Função auxiliar para injetar o content script se necessário

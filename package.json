@@ -5,7 +5,8 @@
     "main": "api-example.js",
     "scripts": {
         "start": "node api-example.js",
-        "dev": "nodemon api-example.js"
+        "dev": "nodemon api-example.js",
+        "build": "node scripts/build.js"
     },
     "keywords": [
         "license",
@@ -20,6 +21,7 @@
         "cors": "^2.8.5"
     },
     "devDependencies": {
+        "javascript-obfuscator": "^4.1.1",
         "nodemon": "^3.0.1"
     },
     "engines": {

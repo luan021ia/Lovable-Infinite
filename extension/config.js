@@ -174,6 +174,22 @@ async function validateKeySecure(key) {
         }
 
         // ============================================
+        // UMA SESSÃO ATIVA POR LICENÇA (evitar compartilhamento)
+        // ============================================
+        const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 min sem ping = sessão liberada
+        const activeSession = cloudLicense.activeSession;
+        if (activeSession && activeSession.deviceFingerprint !== deviceFingerprint && activeSession.lastPingAt) {
+            const lastPing = new Date(activeSession.lastPingAt).getTime();
+            if (Date.now() - lastPing < SESSION_TIMEOUT_MS) {
+                console.log('[Auth] ❌ Licença em uso em outro dispositivo no momento');
+                return {
+                    valid: false,
+                    message: 'Esta licença está em uso em outro dispositivo no momento. Tente novamente mais tarde.'
+                };
+            }
+        }
+
+        // ============================================
         // VALIDAÇÃO POR DEVICE FINGERPRINT
         // ============================================
 
@@ -188,9 +204,11 @@ async function validateKeySecure(key) {
             };
         }
 
-        // Se a licença já foi ativada NESTE dispositivo, permitir acesso permanente
+        // Se a licença já foi ativada NESTE dispositivo, permitir acesso e registrar sessão ativa
         if (cloudLicense.activatedDeviceFingerprint === deviceFingerprint) {
-            console.log('[Auth] ✅ Licença já foi ativada neste dispositivo. Acesso permanente concedido.');
+            const sessionUpdate = { activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() } };
+            await updateLicenseInCloud(cleanKey, sessionUpdate);
+            console.log('[Auth] ✅ Licença já foi ativada neste dispositivo. Sessão registrada.');
             console.log('[Auth] ========== VALIDAÇÃO CONCLUÍDA COM SUCESSO ==========');
             return { 
                 valid: true, 
@@ -206,12 +224,13 @@ async function validateKeySecure(key) {
         
         const newUses = (cloudLicense.uses || 0) + 1;
         
-        // Atualizar com o fingerprint do dispositivo
+        // Atualizar com o fingerprint do dispositivo e registrar sessão ativa
         const updateData = {
             activatedDeviceFingerprint: deviceFingerprint,
             activatedDate: new Date().toISOString(),
             uses: newUses,
-            lastAccessDate: new Date().toISOString()
+            lastAccessDate: new Date().toISOString(),
+            activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() }
         };
 
         console.log('[Auth] Atualizando Firebase com fingerprint do dispositivo');
@@ -280,7 +299,7 @@ async function getStoredLicenseKey() {
 
 async function clearAuthentication() {
     try {
-        await chrome.storage.local.remove(['licenseKey', 'isAuthenticated', 'authTimestamp', 'userData']);
+        await chrome.storage.local.remove(['licenseKey', 'isAuthenticated', 'authTimestamp', 'userData', 'deviceFingerprint', 'firebaseDatabaseURL']);
         console.log('[Config] Autenticação limpa');
     } catch (error) {
         console.error('[Config] Erro ao limpar autenticação:', error);

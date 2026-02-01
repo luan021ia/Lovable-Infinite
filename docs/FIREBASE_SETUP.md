@@ -55,7 +55,7 @@ const firebaseConfig = {
 
 ## 4. Colar no projeto (firebase-config.js)
 
-1. Abra o arquivo **`firebase-config.js`** na raiz do projeto.
+1. Abra o arquivo **`firebase-config.js`** em **`extension/`** e em **`admin/`** (mantenha os dois iguais).
 2. Substitua o objeto **`FIREBASE_CONFIG`** pelos dados do seu novo projeto. Exemplo:
 
 ```javascript

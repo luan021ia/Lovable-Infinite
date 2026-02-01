@@ -1,11 +1,14 @@
 # ============================================
-# GITIGNORE - EXTENSÃO CHROME
+# Lovable Infinity - Git ignore
 # ============================================
 
-# Versão ofuscada (não commitar código ofuscado)
-obfuscated/
+# Build da extensão (não commitar)
+extension/build/
 
-# Node modules (se usar)
+# Firebase cache
+.firebase/
+
+# Node modules
 node_modules/
 
 # Logs

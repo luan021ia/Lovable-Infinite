@@ -10,7 +10,18 @@ let passwordVerified = false;
 document.addEventListener('DOMContentLoaded', async () => {
     // Aguardar inicializacao do license manager
     await licenseManager.init();
-    
+
+    // Toggle "Dias de Validade" quando "Licença vitalícia" estiver marcada
+    const lifetimeCheckbox = document.getElementById('license-lifetime');
+    const expiryDaysGroup = document.getElementById('expiry-days-group');
+    if (lifetimeCheckbox && expiryDaysGroup) {
+        const toggleExpiryVisibility = () => {
+            expiryDaysGroup.style.display = lifetimeCheckbox.checked ? 'none' : 'block';
+        };
+        toggleExpiryVisibility();
+        lifetimeCheckbox.addEventListener('change', toggleExpiryVisibility);
+    }
+
     // Verificar protecao com senha
     checkAdminPassword();
 });
@@ -18,11 +29,64 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Senha padrão na primeira vez (210293)
 const ADMIN_SEED_PASSWORD_HASH = 'MjEwMjkz';
 
+// Sessão do admin: manter login por 30 dias (localStorage + sessionStorage como fallback)
+const ADMIN_SESSION_KEY = 'lovable_admin_session';
+const ADMIN_SESSION_DAYS = 30;
+const ADMIN_SESSION_MS = ADMIN_SESSION_DAYS * 24 * 60 * 60 * 1000;
+
+function _readSessionFrom(storage) {
+    try {
+        const raw = storage.getItem(ADMIN_SESSION_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (!data || typeof data.ts !== 'number') return false;
+        return (Date.now() - data.ts) < ADMIN_SESSION_MS;
+    } catch (e) {
+        return false;
+    }
+}
+
+function hasValidAdminSession() {
+    if (_readSessionFrom(localStorage)) return true;
+    if (typeof sessionStorage !== 'undefined' && _readSessionFrom(sessionStorage)) return true;
+    return false;
+}
+
+function saveAdminSession() {
+    const payload = JSON.stringify({ ts: Date.now() });
+    try {
+        localStorage.setItem(ADMIN_SESSION_KEY, payload);
+    } catch (e) {
+        console.warn('[Admin] localStorage sessão:', e);
+    }
+    try {
+        if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(ADMIN_SESSION_KEY, payload);
+    } catch (e) {
+        console.warn('[Admin] sessionStorage sessão:', e);
+    }
+}
+
+function clearAdminSession() {
+    try {
+        localStorage.removeItem(ADMIN_SESSION_KEY);
+    } catch (e) {}
+    try {
+        if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    } catch (e) {}
+}
+
 /**
  * Verificar se o painel esta protegido com senha
  */
 async function checkAdminPassword() {
     try {
+        // Se já tem sessão válida (login nos últimos 30 dias), entra direto
+        if (hasValidAdminSession()) {
+            console.log('[Admin] Sessão válida – acessando painel.');
+            initializePanel();
+            return;
+        }
+
         const adminPassword = await getAdminPasswordFromCloud();
 
         if (!adminPassword) {
@@ -95,6 +159,7 @@ async function verifyAdminAccess() {
         if (passwordHash === storedPassword) {
             console.log('[Admin] Senha correta!');
             passwordVerified = true;
+            saveAdminSession(); // Manter login por 30 dias
             hidePasswordModal();
             if (passInput) passInput.value = '';
             initializePanel();
@@ -115,6 +180,7 @@ async function verifyAdminAccess() {
  * Inicializar o painel
  */
 function initializePanel() {
+    saveAdminSession(); // Renovar sessão a cada uso (mantém 30 dias)
     setupEventListeners();
     loadDashboard();
     loadManageLicenses();
@@ -148,23 +214,6 @@ function setupEventListeners() {
     
     const btnImport = document.getElementById('btn-import');
     if (btnImport) btnImport.addEventListener('click', importLicenses);
-
-    // Settings Tab
-    const btnSetPassword = document.getElementById('btn-set-password');
-    if (btnSetPassword) btnSetPassword.addEventListener('click', setAdminPassword);
-    
-    const btnClearAll = document.getElementById('btn-clear-all');
-    if (btnClearAll) btnClearAll.addEventListener('click', clearAllLicenses);
-    
-    // Firebase Sync
-    const btnSyncFirebase = document.getElementById('btn-sync-firebase');
-    if (btnSyncFirebase) btnSyncFirebase.addEventListener('click', syncLicensesWithFirebase);
-    
-    const btnTestFirebase = document.getElementById('btn-test-firebase');
-    if (btnTestFirebase) btnTestFirebase.addEventListener('click', testFirebaseConnection);
-    
-    const btnClose = document.getElementById('btn-close');
-    if (btnClose) btnClose.addEventListener('click', () => window.close());
 
     // Modal
     const btnConfirm = document.getElementById('btn-confirm');
@@ -257,16 +306,18 @@ async function loadDashboard() {
             const statusClass = license.active ? 'status-active' : 'status-inactive';
             const statusText = license.active ? 'Ativa' : 'Inativa';
             const activatedText = license.activated ? 'Sim' : 'Nao';
-            const expiryDate = new Date(license.expiryDate).toLocaleDateString('pt-BR');
+            const expiryDisplay = license.lifetime ? 'Vitalício' : new Date(license.expiryDate).toLocaleDateString('pt-BR');
+            const userName = license.userName || '—';
 
             row.innerHTML = `
                 <td><div class="license-key">${license.key}</div></td>
+                <td>${userName}</td>
                 <td><span class="status-badge-small ${statusClass}">${statusText}</span></td>
                 <td>${activatedText}</td>
-                <td>${expiryDate}</td>
+                <td>${expiryDisplay}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="action-btn-small btn-copy" data-key="${license.key}">Copiar</button>
+                        <button class="action-btn-small btn-copy" data-key="${license.key}" data-context="dashboard">Copiar</button>
                         <button class="action-btn-small btn-toggle" data-key="${license.key}" data-active="${license.active}">
                             ${license.active ? 'Desativar' : 'Ativar'}
                         </button>
@@ -278,7 +329,7 @@ async function loadDashboard() {
         });
 
         if (licenses.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">Nenhuma licenca criada ainda</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">Nenhuma licenca criada ainda</td></tr>';
         }
     }
 
@@ -301,7 +352,7 @@ async function loadManageLicenses() {
             const statusText = license.active ? 'Ativa' : 'Inativa';
             const activatedText = license.activated ? 'Sim' : 'Nao';
             const createdDate = new Date(license.created).toLocaleDateString('pt-BR');
-            const expiryDate = new Date(license.expiryDate).toLocaleDateString('pt-BR');
+            const expiryDisplay = license.lifetime ? 'Vitalício' : new Date(license.expiryDate).toLocaleDateString('pt-BR');
 
             row.innerHTML = `
                 <td><div class="license-key">${license.key}</div></td>
@@ -310,10 +361,10 @@ async function loadManageLicenses() {
                 <td><span class="status-badge-small ${statusClass}">${statusText}</span></td>
                 <td>${activatedText}</td>
                 <td>${createdDate}</td>
-                <td>${expiryDate}</td>
+                <td>${expiryDisplay}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="action-btn-small btn-copy" data-key="${license.key}">Copiar</button>
+                        <button class="action-btn-small btn-copy" data-key="${license.key}" data-context="manage">Copiar</button>
                         <button class="action-btn-small btn-view" data-key="${license.key}">Ver</button>
                         <button class="action-btn-small delete btn-delete" data-key="${license.key}">Deletar</button>
                     </div>
@@ -335,11 +386,12 @@ async function loadManageLicenses() {
  * Adicionar event listeners aos botoes da tabela
  */
 function attachTableButtonListeners() {
-    // Botoes Copiar
+    // Botoes Copiar (contexto = dashboard ou manage)
     document.querySelectorAll('.btn-copy').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const key = e.target.getAttribute('data-key');
-            copyLicense(key);
+            const key = e.currentTarget.getAttribute('data-key');
+            const context = e.currentTarget.getAttribute('data-context') || 'dashboard';
+            copyLicense(key, e.currentTarget, context);
         });
     });
 
@@ -375,11 +427,12 @@ function attachTableButtonListeners() {
 async function generateNewLicense() {
     const userName = document.getElementById('user-name')?.value.trim() || '';
     const userPhone = document.getElementById('user-phone')?.value.trim() || '';
-    const expiryDays = parseInt(document.getElementById('expiry-days')?.value) || 30;
+    const isLifetime = document.getElementById('license-lifetime')?.checked === true;
+    const expiryDays = isLifetime ? 30 : (parseInt(document.getElementById('expiry-days')?.value) || 30);
     const maxUses = document.getElementById('max-uses')?.value ? parseInt(document.getElementById('max-uses').value) : null;
 
     try {
-        const license = await licenseManager.generateLicense(expiryDays, maxUses, userName, userPhone);
+        const license = await licenseManager.generateLicense(expiryDays, maxUses, userName, userPhone, isLifetime);
 
         // Mostrar licenca gerada
         const keyElement = document.getElementById('new-license-key');
@@ -395,14 +448,23 @@ async function generateNewLicense() {
         const phoneInput = document.getElementById('user-phone');
         if (phoneInput) phoneInput.value = '';
         
+        const lifetimeCheckbox = document.getElementById('license-lifetime');
+        if (lifetimeCheckbox) lifetimeCheckbox.checked = false;
+        
         const expiryInput = document.getElementById('expiry-days');
         if (expiryInput) expiryInput.value = '30';
+        
+        const expiryDaysGroup = document.getElementById('expiry-days-group');
+        if (expiryDaysGroup) expiryDaysGroup.style.display = 'block';
         
         const maxUsesInput = document.getElementById('max-uses');
         if (maxUsesInput) maxUsesInput.value = '';
 
         // Mostrar alerta de sucesso (já salva no Firebase automaticamente)
-        showAlert('alert-generate', 'Licenca gerada com sucesso! Valida por ' + expiryDays + ' dias. Ja salva na nuvem para ativacao.', 'success');
+        const successMsg = isLifetime
+            ? 'Licenca vitalicia gerada com sucesso! Ja salva na nuvem para ativacao.'
+            : 'Licenca gerada com sucesso! Valida por ' + expiryDays + ' dias. Ja salva na nuvem para ativacao.';
+        showAlert('alert-generate', successMsg, 'success');
 
         // Recarregar dashboard
         setTimeout(() => {
@@ -414,31 +476,76 @@ async function generateNewLicense() {
 }
 
 /**
- * Copiar Licenca para Clipboard
+ * Toast "Copiado!" na aba certa (dashboard, generate, manage)
  */
-function copyLicense(key) {
+function showCopyToast(success, context) {
+    const ctx = context || 'generate';
+    const id = 'copy-toast-' + ctx;
+    // Esconder todos os toasts
+    ['dashboard', 'generate', 'manage'].forEach(c => {
+        const t = document.getElementById('copy-toast-' + c);
+        if (t) t.classList.remove('show');
+    });
+    const toast = document.getElementById(id);
+    if (!toast) return;
+    toast.textContent = success ? 'Copiado!' : 'Erro ao copiar';
+    toast.style.background = success ? 'rgba(16, 185, 129, 0.95)' : 'rgba(239, 68, 68, 0.95)';
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2000);
+}
+
+/**
+ * Feedback visual no botão "Copiar" (texto do botão)
+ */
+function showCopyFeedback(buttonEl, success) {
+    if (buttonEl) {
+        const originalText = buttonEl.textContent;
+        buttonEl.textContent = success ? 'Copiado!' : 'Erro';
+        buttonEl.disabled = true;
+        setTimeout(() => {
+            buttonEl.textContent = originalText;
+            buttonEl.disabled = false;
+        }, 2000);
+    }
+}
+
+/**
+ * Copiar Licenca para Clipboard (contexto = dashboard ou manage)
+ */
+function copyLicense(key, buttonEl, context) {
+    const ctx = context || 'dashboard';
+    const alertId = ctx === 'manage' ? 'alert-manage' : 'alert-generate';
     navigator.clipboard.writeText(key).then(() => {
-        showAlert('alert-generate', 'Licenca copiada para a area de transferencia!', 'success');
+        showCopyFeedback(buttonEl, true);
+        showCopyToast(true, ctx);
     }).catch(err => {
-        showAlert('alert-generate', 'Erro ao copiar: ' + err.message, 'error');
+        showCopyFeedback(buttonEl, false);
+        showCopyToast(false, ctx);
+        showAlert(alertId, 'Erro ao copiar: ' + err.message, 'error');
     });
 }
 
 /**
- * Copiar Licenca Gerada
+ * Copiar Licenca Gerada (sempre contexto "generate")
  */
 function copyToClipboard() {
     const keyElement = document.getElementById('new-license-key');
     const key = keyElement ? keyElement.textContent : '';
-    
+    const btn = document.getElementById('btn-copy-generated');
+
     if (!key) {
         showAlert('alert-generate', 'Gere uma licenca primeiro!', 'error');
         return;
     }
-    
+
     navigator.clipboard.writeText(key).then(() => {
-        showAlert('alert-generate', 'Licenca copiada para a area de transferencia!', 'success');
+        showCopyFeedback(btn, true);
+        showCopyToast(true, 'generate');
     }).catch(err => {
+        showCopyFeedback(btn, false);
+        showCopyToast(false, 'generate');
         showAlert('alert-generate', 'Erro ao copiar: ' + err.message, 'error');
     });
 }
@@ -476,7 +583,8 @@ async function viewLicenseDetails(key) {
             ? license.activatedDevices.join(', ')
             : 'Nenhum dispositivo';
 
-        const message = 'Detalhes da Licenca\n\nChave: ' + license.key + '\nNome: ' + (license.userName || 'Sem nome') + '\nTelefone: ' + (license.userPhone || 'Sem telefone') + '\nCriada: ' + new Date(license.created).toLocaleDateString('pt-BR') + '\nExpira: ' + new Date(license.expiryDate).toLocaleDateString('pt-BR') + '\nStatus: ' + (license.active ? 'Ativa' : 'Inativa') + '\nDispositivos: ' + devicesInfo + '\nUsos: ' + license.uses + (license.maxUses ? ' / ' + license.maxUses : ' (ilimitado)');
+        const expiryLabel = license.lifetime ? 'Vitalício' : new Date(license.expiryDate).toLocaleDateString('pt-BR');
+        const message = 'Detalhes da Licenca\n\nChave: ' + license.key + '\nNome: ' + (license.userName || 'Sem nome') + '\nTelefone: ' + (license.userPhone || 'Sem telefone') + '\nCriada: ' + new Date(license.created).toLocaleDateString('pt-BR') + '\nExpira: ' + expiryLabel + '\nStatus: ' + (license.active ? 'Ativa' : 'Inativa') + '\nDispositivos: ' + devicesInfo + '\nUsos: ' + license.uses + (license.maxUses ? ' / ' + license.maxUses : ' (ilimitado)');
 
         alert(message);
     } catch (error) {
@@ -511,9 +619,9 @@ async function exportLicenses() {
         const json = await licenseManager.exportLicenses();
         const textarea = document.getElementById('export-textarea');
         if (textarea) textarea.value = json;
-        showAlert('alert-settings', 'Licencas exportadas com sucesso!', 'success');
+        showAlert('alert-manage', 'Licencas exportadas com sucesso!', 'success');
     } catch (error) {
-        showAlert('alert-settings', 'Erro: ' + error.message, 'error');
+        showAlert('alert-manage', 'Erro: ' + error.message, 'error');
     }
 }
 
@@ -523,13 +631,13 @@ async function exportLicenses() {
 function copyExport() {
     const textarea = document.getElementById('export-textarea');
     if (!textarea || !textarea.value) {
-        showAlert('alert-settings', 'Exporte as licencas primeiro!', 'error');
+        showAlert('alert-manage', 'Exporte as licencas primeiro!', 'error');
         return;
     }
     navigator.clipboard.writeText(textarea.value).then(() => {
-        showAlert('alert-settings', 'JSON copiado para a area de transferencia!', 'success');
+        showAlert('alert-manage', 'JSON copiado para a area de transferencia!', 'success');
     }).catch(err => {
-        showAlert('alert-settings', 'Erro ao copiar: ' + err.message, 'error');
+        showAlert('alert-manage', 'Erro ao copiar: ' + err.message, 'error');
     });
 }
 
@@ -541,70 +649,23 @@ async function importLicenses() {
     const json = textarea ? textarea.value.trim() : '';
 
     if (!json) {
-        showAlert('alert-settings', 'Cole o JSON das licencas!', 'error');
+        showAlert('alert-manage', 'Cole o JSON das licencas!', 'error');
         return;
     }
 
     try {
         const result = await licenseManager.importLicenses(json);
         if (result.success) {
-            showAlert('alert-settings', result.message, 'success');
+            showAlert('alert-manage', result.message, 'success');
             if (textarea) textarea.value = '';
             loadDashboard();
             loadManageLicenses();
         } else {
-            showAlert('alert-settings', result.message, 'error');
+            showAlert('alert-manage', result.message, 'error');
         }
     } catch (error) {
-        showAlert('alert-settings', 'Erro: ' + error.message, 'error');
+        showAlert('alert-manage', 'Erro: ' + error.message, 'error');
     }
-}
-
-/**
- * Definir senha do Admin (Configurações)
- */
-async function setAdminPassword() {
-    const passInput = document.getElementById('admin-password');
-    const password = (passInput && passInput.value) || '';
-
-    if (!password) {
-        showAlert('alert-settings', 'Digite uma senha!', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showAlert('alert-settings', 'A senha deve ter no mínimo 6 caracteres!', 'error');
-        return;
-    }
-
-    try {
-        console.log('[Admin] Salvando senha...');
-        await saveAdminPasswordToCloud(btoa(password));
-        if (passInput) passInput.value = '';
-        showAlert('alert-settings', 'Senha salva com sucesso!', 'success');
-    } catch (error) {
-        console.error('[Admin] Erro ao salvar:', error);
-        showAlert('alert-settings', 'Erro: ' + error.message, 'error');
-    }
-}
-
-/**
- * Limpar Todas as Licencas
- */
-function clearAllLicenses() {
-    currentAction = async () => {
-        try {
-            await licenseManager.clearAllLicenses();
-            showAlert('alert-settings', 'Todas as licencas foram deletadas!', 'success');
-            loadDashboard();
-            loadManageLicenses();
-            closeModal();
-        } catch (error) {
-            showAlert('alert-settings', 'Erro: ' + error.message, 'error');
-        }
-    };
-
-    showModal('Limpar Todas as Licencas', 'Tem certeza que deseja deletar TODAS as licencas? Esta acao nao pode ser desfeita!');
 }
 
 /**
@@ -655,80 +716,3 @@ function confirmAction() {
 }
 
 
-/**
- * Testar conexão com Firebase
- */
-async function testFirebaseConnection() {
-    const statusDiv = document.getElementById('firebase-status');
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.textContent = '⏳ Testando conexão...';
-    }
-
-    try {
-        if (typeof testFirebaseConnection === 'undefined') {
-            console.error('Firebase não carregado');
-            if (statusDiv) statusDiv.textContent = '❌ Firebase não carregado';
-            return;
-        }
-
-        const result = await window.testFirebaseConnection();
-        
-        if (statusDiv) {
-            if (result.success) {
-                statusDiv.style.background = 'rgba(100, 200, 100, 0.2)';
-                statusDiv.textContent = '✅ ' + result.message;
-            } else {
-                statusDiv.style.background = 'rgba(200, 100, 100, 0.2)';
-                statusDiv.textContent = '❌ ' + result.message;
-            }
-        }
-        
-        showAlert('alert-settings', result.message, result.success ? 'success' : 'error');
-    } catch (error) {
-        console.error('Erro ao testar Firebase:', error);
-        if (statusDiv) {
-            statusDiv.style.background = 'rgba(200, 100, 100, 0.2)';
-            statusDiv.textContent = '❌ Erro: ' + error.message;
-        }
-    }
-}
-
-/**
- * Sincronizar licenças com Firebase
- */
-async function syncLicensesWithFirebase() {
-    const statusDiv = document.getElementById('firebase-status');
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.textContent = '⏳ Sincronizando...';
-    }
-
-    try {
-        if (typeof syncLicensesWithCloud === 'undefined') {
-            console.error('Firebase não carregado');
-            if (statusDiv) statusDiv.textContent = '❌ Firebase não carregado';
-            return;
-        }
-
-        const result = await window.syncLicensesWithCloud();
-        
-        if (statusDiv) {
-            if (result.success) {
-                statusDiv.style.background = 'rgba(100, 200, 100, 0.2)';
-                statusDiv.textContent = '✅ ' + result.message;
-            } else {
-                statusDiv.style.background = 'rgba(200, 100, 100, 0.2)';
-                statusDiv.textContent = '❌ ' + result.message;
-            }
-        }
-        
-        showAlert('alert-settings', result.message, result.success ? 'success' : 'error');
-    } catch (error) {
-        console.error('Erro ao sincronizar:', error);
-        if (statusDiv) {
-            statusDiv.style.background = 'rgba(200, 100, 100, 0.2)';
-            statusDiv.textContent = '❌ Erro: ' + error.message;
-        }
-    }
-}

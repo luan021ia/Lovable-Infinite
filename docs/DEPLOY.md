@@ -16,6 +16,30 @@ Não é necessário criar uma "versão comercial" separada nem outro backend: o 
 
 ---
 
+## Build da extensão (para produção)
+
+Antes de distribuir a extensão, é preciso gerar o **build** (ofuscar o código e montar a pasta pronta para o Chrome).
+
+### Como fazer o build (Windows)
+
+1. **Duplo clique** no arquivo **`scripts\build.bat`** (ou pelo terminal, na raiz do projeto: `scripts\build.bat`).  
+   - O script instala as dependências (se faltar algo), roda o build e mostra o resultado.  
+   - Se aparecer erro de "Node.js não encontrado", instale em: https://nodejs.org/
+
+2. **Ou pelo terminal** (na raiz do projeto):
+   ```bash
+   npm install
+   npm run build
+   ```
+
+O build é criado em **`extension\build\`**. Essa pasta é a que você:
+- carrega no Chrome em `chrome://extensions` → "Carregar sem compactação" (para testar);
+- ou compacta em ZIP para publicar na Chrome Web Store.
+
+**Importante:** Use sempre o conteúdo de `extension\build\` para distribuir. Não distribua a pasta `extension\` inteira (ela contém o código sem ofuscar).
+
+---
+
 ## Arquitetura atual (já correta)
 
 ```
@@ -55,9 +79,11 @@ Assim você acessa o gerador de licenças de qualquer PC/celular, com a mesma se
   - `firebase.json` → configuração do Hosting (pasta a ser publicada).
   - `.firebaserc` → projeto Firebase (preencha com o ID do seu projeto).
 
-**Antes:** preencha `firebase-config.js` e `.firebaserc` (veja **FIREBASE_SETUP.md** nesta pasta).
+**Antes:** preencha `firebase-config.js` (em `admin/` e em `extension/`) e `.firebaserc` na raiz (veja **FIREBASE_SETUP.md** nesta pasta).
 
-**Comandos (na pasta do projeto):**
+**Estrutura:** O painel admin está na pasta `admin/`. O `firebase.json` está configurado com `"public": "admin"`, então só essa pasta é publicada.
+
+**Comandos (na raiz do projeto):**
 
 ```bash
 # Instalar CLI do Firebase (uma vez)
@@ -72,9 +98,9 @@ firebase deploy
 
 Depois do deploy, o admin fica em:
 
-- **https://SEU-PROJECT-ID.web.app/admin.html**
+- **https://SEU-PROJECT-ID.web.app/**
 
-(Substitua `SEU-PROJECT_ID` pelo ID do seu novo projeto Firebase.)
+(Substitua `SEU-PROJECT_ID` pelo ID do seu novo projeto Firebase. O Hosting serve a pasta `admin/`, cuja página inicial é `index.html`.)
 
 Na primeira vez que abrir essa URL, defina a senha do admin (como já faz localmente). A senha fica salva no Firebase (`/admin/password`), então vale para o admin local e para o admin no ar.
 
@@ -91,7 +117,7 @@ Por enquanto, manter como está e só acessar o admin com senha forte já é um 
 
 ### 3. Fluxo de venda
 
-1. Você (ou seu time) abre o admin no ar: `https://SEU-PROJECT-ID.web.app/admin.html`.
+1. Você (ou seu time) abre o admin no ar: `https://SEU-PROJECT-ID.web.app/`.
 2. Faz login com a senha do admin.
 3. Gera a licença (nome, telefone, validade, etc.) → **já é salva no Firebase**.
 4. Copia a chave e envia para o cliente (e-mail, WhatsApp, etc.).
