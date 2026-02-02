@@ -6,529 +6,105 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Admin - Lovable Infinity</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body {
-            width: 100%;
-            min-height: 100vh;
-            max-height: none;
-        }
-
-        .admin-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 40px 20px;
-        }
-
-        .admin-header {
-            margin-bottom: 40px;
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 20px;
-        }
-
-        .admin-header h1 {
-            font-size: 32px;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, var(--accent-light), var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .admin-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .tab-btn {
-            padding: 12px 24px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-weight: 600;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s;
-        }
-
-        .tab-btn.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-
-        .tab-btn:hover {
-            color: var(--text-primary);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .section {
-            background: rgba(20, 24, 41, 0.5);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            backdrop-filter: blur(10px);
-        }
-
-        .section h2 {
-            font-size: 20px;
-            margin-bottom: 20px;
-            color: var(--text-primary);
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px 16px;
-            background: rgba(99, 102, 241, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            background: rgba(99, 102, 241, 0.1);
-            border-color: var(--accent);
-            outline: none;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 12px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 14px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent), var(--accent-light));
-            color: #fff;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
-        }
-
-        .btn-secondary {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--accent);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(99, 102, 241, 0.2);
-        }
-
-        .btn-danger {
-            background: rgba(239, 68, 68, 0.1);
-            color: #fca5a5;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .btn-danger:hover {
-            background: rgba(239, 68, 68, 0.2);
-        }
-
-        .license-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        .license-table th {
-            background: rgba(99, 102, 241, 0.1);
-            padding: 12px 16px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--accent);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .license-table td {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
-            font-size: 13px;
-        }
-
-        .license-table tr:hover {
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        .status-badge-small {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .status-active {
-            background: rgba(16, 185, 129, 0.2);
-            color: #86efac;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .status-inactive {
-            background: rgba(239, 68, 68, 0.2);
-            color: #fca5a5;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 32px;
-            font-weight: 800;
-            color: var(--accent);
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .alert {
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: none;
-            animation: slideDown 0.3s ease;
-        }
-
-        .alert.show {
-            display: block;
-        }
-
-        .alert-success {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #86efac;
-        }
-
-        .alert-error {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-        }
-
-        .license-key {
-            font-family: 'Courier New', monospace;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            word-break: break-all;
-            user-select: all;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .action-btn-small {
-            padding: 6px 12px;
-            font-size: 11px;
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid var(--border);
-            color: var(--accent);
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .action-btn-small:hover {
-            background: rgba(99, 102, 241, 0.2);
-        }
-
-        .action-btn-small.delete {
-            background: rgba(239, 68, 68, 0.1);
-            color: #fca5a5;
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        .action-btn-small.delete:hover {
-            background: rgba(239, 68, 68, 0.2);
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.show {
-            display: flex;
-        }
-
-        .modal-content {
-            background: rgba(20, 24, 41, 0.95);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 40px;
-            max-width: 400px;
-            width: 90%;
-            backdrop-filter: blur(10px);
-        }
-
-        .modal-header {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 20px;
-        }
-
-        .btn-secondary {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--accent);
-            border: 1px solid var(--border);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(99, 102, 241, 0.2);
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.show {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 40px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            color: var(--text-primary);
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 24px;
-            cursor: pointer;
-        }
-
-        .modal-close:hover {
-            color: var(--text-primary);
-        }
-
-        hr {
-            border: none;
-            border-top: 1px solid var(--border);
-            margin: 30px 0;
-        }
-
-        /* Toast "Copiado!" dentro de cada aba (contexto certo) */
-        .tab-content {
-            position: relative;
-        }
-        .copy-toast {
-            position: absolute;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(10px);
-            padding: 12px 24px;
-            background: rgba(16, 185, 129, 0.95);
-            color: #fff;
-            font-weight: 600;
-            font-size: 14px;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            z-index: 100;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.25s ease, transform 0.25s ease;
-        }
-
-        .copy-toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
+        /* Tema escuro – layout full-width; contraste garantido para leitura tranquila */
+        body.admin-page { width: 100%; min-height: 100vh; height: 100vh; background: #0f172a; color: #f1f5f9; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
+        body.admin-page::before { display: none; }
+        .admin-topbar { width: 100%; height: 64px; padding: 0 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; background: #1e293b; border-bottom: 1px solid #334155; flex-shrink: 0; }
+        .admin-topbar h1 { font-size: 20px; font-weight: 600; margin: 0; color: #f1f5f9; letter-spacing: -0.02em; }
+        .admin-topbar-desc { color: #94a3b8; font-size: 13px; font-weight: 400; margin: 2px 0 0 0; }
+        .admin-topbar .btn-cta { padding: 10px 24px; font-size: 14px; font-weight: 600; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s, box-shadow 0.2s; }
+        .admin-topbar .btn-cta:hover { background: #4f46e5; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4); }
+        .admin-main { width: 100%; max-width: 1600px; margin: 0 auto; padding: 32px 40px 48px; box-sizing: border-box; }
+        .section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .section h2 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: #f1f5f9; letter-spacing: -0.01em; line-height: 1.4; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; text-transform: none; letter-spacing: 0; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f1f5f9; font-family: inherit; font-size: 14px; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s; }
+        .form-group input::placeholder, .form-group textarea::placeholder { color: #64748b; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+        .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; text-transform: none; font-weight: 500; font-size: 14px; color: #e2e8f0; }
+        .checkbox-label input { width: auto; accent-color: #6366f1; }
+        .button-group { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-size: 14px; }
+        .btn-primary { background: #6366f1; color: #fff; }
+        .btn-primary:hover { background: #4f46e5; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4); }
+        .btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
+        .btn-secondary:hover { background: #334155; border-color: #64748b; color: #f1f5f9; }
+        .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.25); border-color: #f87171; color: #fecaca; }
+        .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; margin-bottom: 32px; }
+        .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 24px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: box-shadow 0.2s, border-color 0.2s; }
+        .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.25); border-color: #475569; }
+        .stat-number { font-size: 28px; font-weight: 600; color: #f1f5f9; margin-bottom: 8px; letter-spacing: -0.02em; }
+        .stat-label { font-size: 12px; color: #94a3b8; font-weight: 500; text-transform: none; letter-spacing: 0; }
+        .license-table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 13px; }
+        .license-table th { background: #0f172a; padding: 12px 16px; text-align: left; font-weight: 500; color: #94a3b8; border-bottom: 1px solid #334155; font-size: 11px; text-transform: none; letter-spacing: 0.02em; }
+        .license-table td { padding: 14px 16px; border-bottom: 1px solid #334155; color: #e2e8f0; }
+        .license-table tbody tr:hover { background: rgba(51, 65, 85, 0.4); }
+        .license-table tbody tr:last-child td { border-bottom: none; }
+        .status-badge-small { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; text-transform: none; }
+        .status-active { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.4); }
+        .status-inactive { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+        .status-expiring { background: rgba(251, 191, 36, 0.2); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.4); }
+        .license-key { font-family: ui-monospace, monospace; background: #0f172a; color: #94a3b8; padding: 6px 10px; border-radius: 6px; font-size: 11px; word-break: break-all; user-select: all; border: 1px solid #334155; }
+        .action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+        .action-btn-small { padding: 6px 12px; font-size: 12px; background: #1e293b; border: 1px solid #475569; color: #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-weight: 500; }
+        .action-btn-small:hover { background: #334155; color: #f1f5f9; border-color: #64748b; }
+        .action-btn-small.delete { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.4); }
+        .action-btn-small.delete:hover { background: rgba(239, 68, 68, 0.25); color: #fecaca; border-color: #f87171; }
+        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 14px; }
+        .alert.show { display: block; }
+        .alert-success { background: rgba(52, 211, 153, 0.15); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.4); }
+        .alert-error { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+        .modal.show { display: flex; }
+        .modal-content { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px; max-width: 440px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        .modal-content.modal-edit { max-width: 500px; }
+        .modal-header { font-size: 18px; font-weight: 600; color: #f1f5f9; margin-bottom: 20px; padding-right: 32px; letter-spacing: -0.01em; }
+        .modal-close { position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+        .modal-close:hover { color: #f1f5f9; background: rgba(255,255,255,0.06); }
+        .import-export-toggle { margin-bottom: 0; }
+        .import-export-body { display: none; padding-top: 20px; margin-top: 20px; border-top: 1px solid #334155; }
+        .import-export-body.show { display: block; }
+        .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); padding: 10px 20px; background: #1e293b; color: #f1f5f9; font-weight: 500; font-size: 13px; border-radius: 8px; border: 1px solid #475569; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10001; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+        .copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .modal-content #modal-message { color: #94a3b8; margin-bottom: 20px; line-height: 1.5; }
+        .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px 0 0; border-radius: 8px; }
+        .license-table { min-width: 720px; }
+        @media (max-width: 768px) {
+            .admin-topbar { padding: 0 24px; flex-wrap: wrap; height: auto; min-height: 64px; padding-top: 12px; padding-bottom: 12px; gap: 8px; }
+            .admin-topbar h1 { font-size: 18px; }
+            .admin-topbar-desc { font-size: 12px; }
+            .admin-main { padding: 24px 24px 48px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; }
+            .stat-number { font-size: 24px; }
+            .section { padding: 20px 24px; }
+            .modal { padding: 16px; align-items: flex-start; padding-top: max(16px, env(safe-area-inset-top)); }
+            .modal-content { max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+            .copy-toast { bottom: max(24px, env(safe-area-inset-bottom)); }
         }
     </style>
 </head>
 
-<body>
-    <div class="admin-container">
-        <!-- Header -->
-        <div class="admin-header">
-            <h1>🔐 Painel de Administração</h1>
-            <p style="color: var(--text-secondary); font-size: 14px;">Lovable Infinity - Gerenciamento de Licenças</p>
+<body class="admin-page">
+    <header class="admin-topbar">
+        <div>
+            <h1>Painel de Administração</h1>
+            <p class="admin-topbar-desc">Lovable Infinity – Gerenciamento de Licenças</p>
         </div>
+        <button type="button" class="btn-cta" id="btn-open-create-modal">Criar licença</button>
+    </header>
 
-        <!-- Tabs -->
-        <div class="admin-tabs">
-            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-            <button class="tab-btn" data-tab="generate">Gerar Licença</button>
-            <button class="tab-btn" data-tab="manage">Gerenciar</button>
-        </div>
+    <main class="admin-main">
+        <div id="alert-main" class="alert" aria-live="polite"></div>
+        <div id="copy-toast" class="copy-toast" aria-live="polite">Copiado!</div>
 
-        <!-- Dashboard Tab -->
-        <div id="dashboard" class="tab-content active">
-            <div id="copy-toast-dashboard" class="copy-toast" aria-live="polite">Copiado!</div>
-            <div class="stats-grid" id="stats-grid"></div>
-            <div class="section">
-                <h2>Licenças Ativas</h2>
-                <table class="license-table">
-                    <thead>
-                        <tr>
-                            <th>Chave</th>
-                            <th>Nome</th>
-                            <th>Status</th>
-                            <th>Ativada</th>
-                            <th>Expiração</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="licenses-tbody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <div class="stats-grid" id="stats-grid"></div>
 
-        <!-- Generate Tab -->
-        <div id="generate" class="tab-content">
-            <div id="copy-toast-generate" class="copy-toast" aria-live="polite">Copiado!</div>
-            <div class="section">
-                <h2>Gerar Nova Licença</h2>
-                <div class="alert" id="alert-generate"></div>
-
-                <div class="form-group">
-                    <label>Nome do Usuário</label>
-                    <input type="text" id="user-name" placeholder="Ex: João Silva">
-                </div>
-
-                <div class="form-group">
-                    <label>Telefone do Usuário</label>
-                    <input type="tel" id="user-phone" placeholder="Ex: (11) 99999-9999">
-                </div>
-
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="license-lifetime" name="license-lifetime">
-                        <span>Licença vitalícia</span>
-                    </label>
-                </div>
-                <div class="form-group" id="expiry-days-group">
-                    <label>Dias de Validade</label>
-                    <input type="number" id="expiry-days" value="30" min="1" max="365">
-                </div>
-
-                <div class="form-group">
-                    <label>Limite de Usos (deixe em branco para ilimitado)</label>
-                    <input type="number" id="max-uses" placeholder="Ex: 100">
-                </div>
-
-                <div class="button-group">
-                    <button class="btn btn-primary" id="btn-generate">Gerar Licença</button>
-                </div>
-
-                <div id="generated-license" style="display: none; margin-top: 20px;">
-                    <div class="form-group">
-                        <label>Licença Gerada</label>
-                        <div class="license-key" id="new-license-key"></div>
-                    </div>
-                    <button class="btn btn-secondary" id="btn-copy-generated">Copiar Licença</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Manage Tab -->
-        <div id="manage" class="tab-content">
-            <div id="copy-toast-manage" class="copy-toast" aria-live="polite">Copiado!</div>
-            <div class="section">
-                <div class="alert" id="alert-manage"></div>
-                <h2>Gerenciar Licenças</h2>
+        <div class="section">
+            <div class="admin-table-wrap">
                 <table class="license-table">
                     <thead>
                         <tr>
@@ -537,50 +113,134 @@
                             <th>Telefone</th>
                             <th>Status</th>
                             <th>Ativada</th>
-                            <th>Criada</th>
                             <th>Expiração</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="manage-tbody">
-                    </tbody>
+                    <tbody id="licenses-tbody"></tbody>
                 </table>
             </div>
+        </div>
 
-            <div class="section">
-                <h2>Importar/Exportar</h2>
+        <div class="section">
+            <button type="button" class="btn btn-secondary import-export-toggle" id="btn-toggle-import-export" aria-expanded="false">Importar / Exportar</button>
+            <div class="import-export-body" id="import-export-body">
                 <div class="form-group">
                     <label>Exportar Licenças (JSON)</label>
-                    <textarea id="export-textarea" readonly style="height: 150px;"></textarea>
+                    <textarea id="export-textarea" readonly rows="4" style="resize: vertical;"></textarea>
                 </div>
                 <div class="button-group">
-                    <button class="btn btn-secondary" id="btn-export">Exportar</button>
-                    <button class="btn btn-secondary" id="btn-copy-export">Copiar JSON</button>
+                    <button type="button" class="btn btn-secondary" id="btn-export">Exportar</button>
+                    <button type="button" class="btn btn-secondary" id="btn-copy-export">Copiar JSON</button>
                 </div>
-
-                <div class="form-group" style="margin-top: 20px;">
+                <div class="form-group" style="margin-top: 16px;">
                     <label>Importar Licenças (JSON)</label>
-                    <textarea id="import-textarea" placeholder="Cole o JSON aqui..." style="height: 150px;"></textarea>
+                    <textarea id="import-textarea" placeholder="Cole o JSON aqui..." rows="4" style="resize: vertical;"></textarea>
                 </div>
-                <button class="btn btn-primary" id="btn-import">Importar</button>
+                <button type="button" class="btn btn-primary" id="btn-import">Importar</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Criar licença -->
+    <div id="modal-create" class="modal" role="dialog" aria-labelledby="modal-create-title">
+        <div class="modal-content">
+            <button type="button" class="modal-close" id="modal-create-close" aria-label="Fechar">×</button>
+            <h2 class="modal-header" id="modal-create-title">Criar licença</h2>
+            <div class="form-group">
+                <label>Nome do usuário</label>
+                <input type="text" id="create-user-name" placeholder="Ex: João Silva">
+            </div>
+            <div class="form-group">
+                <label>Telefone do usuário</label>
+                <input type="tel" id="create-user-phone" placeholder="Ex: (11) 99999-9999">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="create-license-lifetime">
+                    <span>Licença vitalícia</span>
+                </label>
+            </div>
+            <div class="form-group" id="create-expiry-days-group">
+                <label>Dias de validade</label>
+                <input type="number" id="create-expiry-days" value="30" min="1" max="365">
+            </div>
+            <div class="form-group">
+                <label>Limite de usos (vazio = ilimitado)</label>
+                <input type="number" id="create-max-uses" placeholder="Ex: 100">
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="btn-create-submit">Gerar licença</button>
+                <button type="button" class="btn btn-secondary" id="btn-create-cancel">Cancelar</button>
+            </div>
+            <div id="create-result" style="display: none; margin-top: 20px;">
+                <div class="form-group">
+                    <label>Licença gerada</label>
+                    <div class="license-key" id="create-new-license-key"></div>
+                </div>
+                <button type="button" class="btn btn-secondary" id="btn-create-copy">Copiar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Confirmação -->
+    <!-- Modal Editar licença -->
+    <div id="modal-edit" class="modal" role="dialog" aria-labelledby="modal-edit-title">
+        <div class="modal-content modal-edit">
+            <button type="button" class="modal-close" id="modal-edit-close" aria-label="Fechar">×</button>
+            <h2 class="modal-header" id="modal-edit-title">Editar licença</h2>
+            <input type="hidden" id="edit-license-key" value="">
+            <div class="form-group">
+                <label>Chave (somente leitura)</label>
+                <div class="license-key" id="edit-license-key-display"></div>
+            </div>
+            <div class="form-group">
+                <label>Nome do usuário</label>
+                <input type="text" id="edit-user-name" placeholder="Nome">
+            </div>
+            <div class="form-group">
+                <label>Telefone do usuário</label>
+                <input type="tel" id="edit-user-phone" placeholder="Telefone">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="edit-active">
+                    <span>Licença ativa</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="edit-lifetime">
+                    <span>Licença vitalícia</span>
+                </label>
+            </div>
+            <div class="form-group" id="edit-expiry-group">
+                <label>Data de expiração</label>
+                <input type="date" id="edit-expiry-date">
+            </div>
+            <div class="form-group">
+                <label>Limite de usos (vazio = ilimitado)</label>
+                <input type="number" id="edit-max-uses" placeholder="Ilimitado">
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="btn-edit-submit">Salvar</button>
+                <button type="button" class="btn btn-secondary" id="btn-edit-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmação -->
     <div id="confirm-modal" class="modal">
         <div class="modal-content">
-            <button class="modal-close" id="modal-close">×</button>
+            <button type="button" class="modal-close" id="modal-close" aria-label="Fechar">×</button>
             <div class="modal-header" id="modal-title"></div>
-            <p id="modal-message" style="color: var(--text-secondary); margin-bottom: 20px;"></p>
+            <p id="modal-message"></p>
             <div class="button-group">
-                <button class="btn btn-primary" id="btn-confirm">Confirmar</button>
-                <button class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm">Confirmar</button>
+                <button type="button" class="btn btn-secondary" id="btn-cancel">Cancelar</button>
             </div>
         </div>
     </div>
 
-    <!-- Firebase Config (sem SDK externo, usa REST API) -->
     <script src="firebase-config.js"></script>
     <script src="license-manager.js"></script>
     <script src="admin.js"></script>

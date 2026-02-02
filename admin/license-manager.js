@@ -270,6 +270,7 @@ class LicenseManager {
 
     /**
      * Edita uma licença
+     * No admin web, sincroniza com Firebase após atualizar localmente
      */
     async editLicense(key, updates) {
         await this.loadLicenses();
@@ -281,6 +282,14 @@ class LicenseManager {
 
         Object.assign(license, updates);
         await this.saveLicenses();
+
+        if (!hasChromeStorage() && typeof updateLicenseInCloud !== 'undefined') {
+            try {
+                await updateLicenseInCloud(key, updates);
+            } catch (e) {
+                console.warn('[LicenseManager] Erro ao sincronizar edição com Firebase:', e);
+            }
+        }
         return { success: true, message: 'Licença atualizada', license };
     }
 
@@ -402,13 +411,21 @@ class LicenseManager {
     async getStats() {
         await this.loadLicenses();
         
+        const now = new Date();
+        const EXPIRING_DAYS = 30;
         const total = this.licenses.length;
         const active = this.licenses.filter(l => l.active).length;
         const activated = this.licenses.filter(l => l.activated).length;
         const expired = this.licenses.filter(l => {
-            const now = new Date();
             const expiry = new Date(l.expiryDate);
             return now > expiry;
+        }).length;
+        const expiringSoon = this.licenses.filter(l => {
+            if (!l.active || l.lifetime) return false;
+            const expiry = new Date(l.expiryDate);
+            const limit = new Date(now);
+            limit.setDate(limit.getDate() + EXPIRING_DAYS);
+            return expiry >= now && expiry <= limit;
         }).length;
 
         return {
@@ -416,6 +433,7 @@ class LicenseManager {
             active,
             activated,
             expired,
+            expiringSoon,
             available: active - expired
         };
     }
