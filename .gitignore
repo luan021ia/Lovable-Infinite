@@ -5,6 +5,9 @@
 # Build da extensão (não commitar)
 extension/build/
 
+# Pacote para sócio (gerado por npm run prepare-partner)
+extension-para-socio/
+
 # Firebase cache
 .firebase/
 
@@ -26,6 +29,11 @@ desktop.ini
 *.swo
 *~
 
+# Env com chaves (não commitar)
+.env
+.env.local
+.env.*.local
+
 # Temporários
 *.tmp
 temp/
@@ -38,3 +46,4 @@ backup/
 # Arquivos de build
 dist/
 build/
+.vercel

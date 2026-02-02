@@ -6,7 +6,8 @@
     "scripts": {
         "start": "node api-example.js",
         "dev": "nodemon api-example.js",
-        "build": "node scripts/build.js"
+        "build": "node scripts/build.js",
+        "preparacao-para-o-socio": "node scripts/preparacao-para-o-socio.js"
     },
     "keywords": [
         "license",
@@ -21,6 +22,7 @@
         "cors": "^2.8.5"
     },
     "devDependencies": {
+        "archiver": "^7.0.1",
         "javascript-obfuscator": "^4.1.1",
         "nodemon": "^3.0.1"
     },

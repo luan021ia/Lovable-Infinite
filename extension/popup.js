@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ============================================
     // VERIFICAÇÃO DE AUTENTICAÇÃO COM LICENÇA
     // ============================================
-    
+
     // Verificar se tem licença ativa
     const authData = await chrome.storage.local.get(['isAuthenticated', 'licenseKey']);
 
@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     const attachBtn = document.getElementById('attach-btn');
+    const improvePromptBtn = document.getElementById('improve-prompt-btn');
     const statusBadge = document.getElementById('status-badge');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
     const historyListBtn = document.getElementById('history-list-btn');
@@ -285,6 +286,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
 
+    // Um único anexo: do input de arquivo OU colado (Ctrl+V)
+    let currentAttachedFile = null;
+
     attachBtn.addEventListener('click', () => {
         fileInput.click();
     });
@@ -292,7 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Helper: Update Send Button State
     function updateSendButtonState() {
         const hasText = messageInput.value.trim().length > 0;
-        const hasFile = fileInput.files.length > 0;
+        const hasFile = !!currentAttachedFile;
 
         if (hasText || hasFile) {
             sendBtn.removeAttribute('disabled');
@@ -301,84 +305,195 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /**
+     * Remove formatação markdown do texto para evitar problemas com o Lovable
+     * Converte: # Título -> Título:, - item -> item, **bold** -> bold, etc.
+     */
+    function sanitizeMarkdown(text) {
+        if (!text) return '';
+
+        return text
+            // Remove headers markdown (# ## ### etc) e adiciona dois-pontos
+            .replace(/^#{1,6}\s+(.+)$/gm, '$1:')
+            // Remove asteriscos de bold/italic
+            .replace(/\*\*(.+?)\*\*/g, '$1')
+            .replace(/\*(.+?)\*/g, '$1')
+            .replace(/__(.+?)__/g, '$1')
+            .replace(/_(.+?)_/g, '$1')
+            // Remove backticks de código
+            .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
+            // Remove marcadores de lista (- ou *) - usa hífen simples para compatibilidade
+            .replace(/^[-*]\s+/gm, '- ')
+            // Remove linhas horizontais
+            .replace(/^[-*_]{3,}$/gm, '')
+            // Remove links markdown [text](url) -> text
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            // Remove múltiplas quebras de linha
+            .replace(/\n{3,}/g, '\n\n')
+            // Trim final
+            .trim();
+    }
+
+    function showPreviewForFile(file) {
+        if (!file) return;
+        filePreviewContainer.style.display = 'flex';
+        filePreviewContainer.innerHTML = '';
+
+        const chip = document.createElement('div');
+        chip.className = 'file-preview-chip';
+
+        chip.innerHTML = `
+            <span class="file-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            </span>
+            <span class="file-name">${file.name}</span>
+            <button class="remove-file-btn" title="Remover">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        `;
+
+        chip.querySelector('.remove-file-btn').addEventListener('click', () => {
+            clearFile();
+        });
+
+        filePreviewContainer.appendChild(chip);
+        attachBtn.classList.add('active');
+        messageInput.focus();
+    }
+
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            // Show preview
-            filePreviewContainer.style.display = 'flex';
-
-            // Clear previous previews (since we only support 1 file for now, based on logic)
-            filePreviewContainer.innerHTML = '';
-
-            const file = fileInput.files[0];
-
-            // Create Chip
-            const chip = document.createElement('div');
-            chip.className = 'file-preview-chip';
-
-            chip.innerHTML = `
-                <span class="file-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-                </span>
-                <span class="file-name">${file.name}</span>
-                <button class="remove-file-btn" title="Remover">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
-            `;
-
-            // Add remove logic
-            chip.querySelector('.remove-file-btn').addEventListener('click', () => {
-                clearFile();
-            });
-
-            filePreviewContainer.appendChild(chip);
-
-            // Highlight attach button
-            attachBtn.classList.add('active');
-
-            // Focus back on input
-            messageInput.focus();
+            currentAttachedFile = fileInput.files[0];
+            showPreviewForFile(currentAttachedFile);
         }
         updateSendButtonState();
     });
 
+    // Colar imagem (Ctrl+V): print ou imagem copiada
+    messageInput.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
+                e.preventDefault();
+                const blob = item.getAsFile();
+                if (!blob) return;
+                const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/jpeg' || blob.type === 'image/jpg' ? 'jpg' : 'png';
+                currentAttachedFile = new File([blob], `imagem-colada.${ext}`, { type: blob.type });
+                fileInput.value = '';
+                showPreviewForFile(currentAttachedFile);
+                updateSendButtonState();
+                return;
+            }
+        }
+    });
+
     function clearFile() {
+        currentAttachedFile = null;
         fileInput.value = '';
         filePreviewContainer.style.display = 'none';
         attachBtn.classList.remove('active');
         updateSendButtonState();
     }
 
-    async function sendMessage() {
-        const text = messageInput.value.trim();
-        const file = fileInput.files.length > 0 ? fileInput.files[0] : null;
+    // Envio: mesma lógica para (1) grampo → anexar → texto → enviar e (2) texto melhorado + imagem (Ctrl+V ou anexo).
+    // FormData no background: file primeiro, depois message, projectId, token, timestamp, chatMode (ordem fixa).
+    /** Obtém token do background (capturado via webRequest). Fonte mais confiável que o content script. */
+    function getTokenFromBackground() {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(null), 2000);
+            chrome.runtime.sendMessage({ action: 'getToken' }, (response) => {
+                clearTimeout(timeout);
+                if (chrome.runtime.lastError) resolve(null);
+                else resolve(response && response.token ? response.token : null);
+            });
+        });
+    }
 
-        // Must have either text or file
+    function getTokenFromActiveTab() {
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(null), 1500);
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (!tabs || tabs.length === 0) { clearTimeout(timeout); resolve(null); return; }
+                const tab = tabs[0];
+                if (!tab || !tab.url || !tab.url.includes('lovable.dev')) { clearTimeout(timeout); resolve(null); return; }
+                chrome.tabs.sendMessage(tab.id, { action: 'getToken' }, (response) => {
+                    clearTimeout(timeout);
+                    if (chrome.runtime.lastError) resolve(null);
+                    else resolve(response && response.token ? response.token : null);
+                });
+            });
+        });
+    }
+
+    async function sendMessage() {
+        // DEBUG: Log inicial
+        console.log('[DEBUG sendMessage] Iniciando envio...');
+        console.log('[DEBUG sendMessage] messageInput.value:', messageInput.value);
+        console.log('[DEBUG sendMessage] messageInput.readOnly:', messageInput.readOnly);
+
+        // O que está no input (digitado ou colocado pelo Melhorar prompt) + anexo se houver. Mesma lógica sempre.
+        const rawText = messageInput.value || '';
+        const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const file = currentAttachedFile;
+
+        console.log('[DEBUG sendMessage] text após trim:', text.substring(0, 100) + '...');
+        console.log('[DEBUG sendMessage] file:', file ? file.name : 'null');
+
         if (!text && !file) return;
 
-        // ... existing webhook checks ...
         if (!config.webhookUrl) {
             addSystemMessage('Erro: Webhook URL não configurada.');
             return;
         }
 
-        // Check if we need to refresh token from storage
-        if (!config.token) {
-            const freshStore = await chrome.storage.local.get(['lovable_token']);
-            if (freshStore.lovable_token) {
-                config.token = freshStore.lovable_token;
+        // Garantir token antes de enviar: background (webRequest) é a fonte mais confiável
+        async function ensureToken() {
+            if (config.token) return true;
+            const fromStorage = await chrome.storage.local.get(['lovable_token']);
+            if (fromStorage.lovable_token) {
+                config.token = fromStorage.lovable_token;
+                updateTokenDisplay(config.token);
+                return true;
+            }
+            const fromBg = await getTokenFromBackground();
+            if (fromBg) {
+                config.token = fromBg;
+                updateTokenDisplay(config.token);
+                return true;
+            }
+            const fromTab = await getTokenFromActiveTab();
+            if (fromTab) {
+                config.token = fromTab;
+                updateTokenDisplay(config.token);
+                return true;
+            }
+            return false;
+        }
+
+        await ensureToken();
+
+        await captureData();
+
+        if (file && !config.token) {
+            const freshToken = await getTokenFromActiveTab();
+            if (freshToken) {
+                config.token = freshToken;
                 updateTokenDisplay(config.token);
             }
         }
 
-        // Refresh project ID from current tab if needed
-        await captureData();
+        console.log('[DEBUG sendMessage] config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
+        console.log('[DEBUG sendMessage] config.projectId:', config.projectId || 'VAZIO');
 
         if (!config.token || !config.projectId) {
-            addSystemMessage('Alerta: Token ou ID do projeto ausentes. Dê um refresh na página do Lovable para capturar.');
+            console.log('[DEBUG sendMessage] ERRO: Token ou projectId ausentes!');
+            addSystemMessage('Alerta: Token ou ID do projeto ausentes. Dê um refresh na página do Lovable e tente de novo.');
             return;
         }
 
-        // Add user message to UI
+        // Add user message to UI (mesmo texto que será enviado no payload)
         const messageContent = text + (file ? ` [Imagem enviada]` : '');
         addMessage(messageContent, 'user');
 
@@ -409,34 +524,49 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Clear file input AFTER processing
         clearFile();
 
-        // Send to Webhook via BACKGROUND
+        const payload = {
+            message: text,
+            projectId: config.projectId,
+            token: config.token,
+            timestamp: new Date().toISOString(),
+            chatMode: false
+        };
+
+        console.log('[DEBUG sendMessage] Payload preparado:', JSON.stringify(payload).substring(0, 200) + '...');
+        console.log('[DEBUG sendMessage] fileData:', fileData ? { name: fileData.name, type: fileData.type, dataLength: fileData.data?.length } : 'null');
+
+        const doSend = () => {
+            try {
+                chrome.runtime.sendMessage({
+                    action: "sendWebhookWithFile",
+                    url: config.webhookUrl,
+                    payload,
+                    file: fileData
+                }, (response) => {
+                    console.log('[DEBUG sendMessage] Resposta do webhook:', JSON.stringify(response));
+                    if (chrome.runtime.lastError) {
+                        console.log('[DEBUG sendMessage] chrome.runtime.lastError:', chrome.runtime.lastError.message);
+                        addSystemMessage("Erro: " + chrome.runtime.lastError.message);
+                        return;
+                    }
+                    if (response && response.success) {
+                        console.log('[DEBUG sendMessage] Sucesso! response.data:', JSON.stringify(response.data));
+                        const json = response.data || {};
+                        if (json.reply) addSystemMessage(json.reply);
+                        else addSystemMessage('Mensagem enviada com sucesso!');
+                    } else {
+                        console.log('[DEBUG sendMessage] Falha! response.error:', response?.error);
+                        addSystemMessage(`Erro ao enviar: ${response.error || 'Desconhecido'}`);
+                    }
+                });
+            } catch (error) {
+                addSystemMessage(`Erro interno: ${error.message}`);
+            }
+        };
+
         try {
-            chrome.runtime.sendMessage({
-                action: "sendWebhookWithFile",
-                url: config.webhookUrl,
-                payload: {
-                    message: text,
-                    projectId: config.projectId,
-                    token: config.token,
-                    timestamp: new Date().toISOString(),
-                    chatMode: false
-                },
-                file: fileData
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    addSystemMessage("Erro: " + chrome.runtime.lastError.message);
-                    return;
-                }
-
-                if (response && response.success) {
-                    const json = response.data || {};
-                    if (json.reply) addSystemMessage(json.reply);
-                    else addSystemMessage('Mensagem enviada com sucesso!');
-                } else {
-                    addSystemMessage(`Erro ao enviar: ${response.error || 'Desconhecido'}`);
-                }
-            });
-
+            // Envio único: o que está no input (digitado ou colocado pelo Melhorar prompt) + anexo se houver. Sem lógica especial.
+            doSend();
         } catch (error) {
             addSystemMessage(`Erro interno: ${error.message}`);
         }
@@ -515,6 +645,135 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     historyDropdown.addEventListener('click', function (e) {
         e.stopPropagation();
+    });
+
+    // Melhorar prompt: apenas troca o texto no input. O envio continua igual (como se o usuário tivesse digitado).
+    improvePromptBtn.addEventListener('click', async () => {
+        console.log('[DEBUG Enhanced] INÍCIO - config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
+        console.log('[DEBUG Enhanced] INÍCIO - config.projectId:', config.projectId || 'VAZIO');
+
+        const text = messageInput.value.trim();
+        if (!text) {
+            addSystemMessage('Digite algo para melhorar.');
+            messageInput.focus();
+            return;
+        }
+        const endpoint = (typeof CONFIG !== 'undefined' && CONFIG.IMPROVE_PROMPT_ENDPOINT) ? CONFIG.IMPROVE_PROMPT_ENDPOINT : '';
+        if (!endpoint) {
+            addSystemMessage('Melhorador de prompt não configurado (IMPROVE_PROMPT_ENDPOINT).');
+            return;
+        }
+        improvePromptBtn.disabled = true;
+        improvePromptBtn.classList.add('loading');
+        improvePromptBtn.setAttribute('aria-busy', 'true');
+        improvePromptBtn.title = 'Melhorando...';
+        messageInput.readOnly = true;
+        messageInput.classList.add('improving');
+        messageInput.placeholder = 'Melhorando prompt...';
+        attachBtn.disabled = true;
+        sendBtn.disabled = true;
+        // Não limpar o input aqui: só substituir quando o primeiro chunk da IA chegar. Se a API falhar, o texto original fica na caixa.
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, stream: false })
+            });
+            const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+            const isJson = contentType.includes('application/json');
+            let fullText = '';
+
+            if (!response.ok) {
+                const errText = await response.text();
+                let errMsg = 'Erro ao melhorar prompt.';
+                try {
+                    const errData = JSON.parse(errText);
+                    errMsg = errData.error || errData.message || errMsg;
+                } catch (_) {
+                    if (errText) errMsg = errText.slice(0, 200);
+                    else errMsg = response.status + ' ' + (response.statusText || errMsg);
+                }
+                if (errMsg && (errMsg.includes('resposta vazia') || errMsg.includes('Open Router retornou resposta vazia'))) {
+                    errMsg = 'A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).';
+                }
+                addSystemMessage(errMsg);
+                return;
+            }
+
+            if (isJson) {
+                const json = await response.json();
+                if (json.error) {
+                    addSystemMessage(json.error);
+                    return;
+                }
+                const msg = json.text ?? json.choices?.[0]?.message?.content ?? json.choices?.[0]?.delta?.content ?? json.message ?? '';
+                if (typeof msg === 'string') fullText = msg.trim();
+                else if (Array.isArray(msg)) fullText = msg.map(p => (p && typeof p.text === 'string') ? p.text : (typeof p === 'string' ? p : '')).join('').trim();
+                else fullText = '';
+            } else {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const parseDataLine = (payload) => {
+                    if (!payload || payload === '[DONE]') return null;
+                    try {
+                        const data = JSON.parse(payload);
+                        const content = data.choices?.[0]?.delta?.content ?? data.choices?.[0]?.message?.content ?? null;
+                        return typeof content === 'string' ? content : null;
+                    } catch (_) { return null; }
+                };
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const content = parseDataLine(line.slice(6).trim());
+                            if (content) {
+                                fullText += content;
+                                messageInput.value = fullText;
+                                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    }
+                }
+                if (buffer.startsWith('data: ')) {
+                    const content = parseDataLine(buffer.slice(6).trim());
+                    if (content) fullText += content;
+                }
+            }
+
+            if (fullText) {
+                // Sanitiza o markdown para evitar problemas com o Lovable
+                const cleanText = sanitizeMarkdown(fullText);
+                console.log('[DEBUG Enhanced] Texto sanitizado:', cleanText.substring(0, 100) + '...');
+                messageInput.value = cleanText;
+                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                messageInput.scrollTop = messageInput.scrollHeight;
+                updateSendButtonState();
+            } else {
+                addSystemMessage('A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).');
+            }
+            messageInput.focus();
+        } catch (e) {
+            addSystemMessage('Erro: ' + (e.message || 'desconhecido'));
+        } finally {
+            console.log('[DEBUG Enhanced] FINALLY - config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
+            console.log('[DEBUG Enhanced] FINALLY - config.projectId:', config.projectId || 'VAZIO');
+
+            improvePromptBtn.disabled = false;
+            improvePromptBtn.classList.remove('loading');
+            improvePromptBtn.removeAttribute('aria-busy');
+            improvePromptBtn.title = 'Melhorar prompt com IA';
+            messageInput.readOnly = false;
+            messageInput.classList.remove('improving');
+            messageInput.placeholder = 'Enviar mensagem...';
+            attachBtn.disabled = false;
+            sendBtn.disabled = false;
+            updateSendButtonState();
+        }
     });
 
     // Event Listeners
@@ -601,46 +860,74 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }, 1500);
 
-    // Tentar capturar token do content script ao abrir o popup
-    function requestTokenFromContent() {
+    // Tentar capturar token: content script + background (background é a fonte mais confiável)
+    function applyTokenIfFound(token, source) {
+        if (token) {
+            config.token = token;
+            updateTokenDisplay(config.token);
+            console.log('[Popup] Token obtido do', source + ':', config.token.substring(0, 20) + '...');
+        }
+    }
+
+    async function requestTokenFromContent() {
         try {
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (!tabs || tabs.length === 0) {
-                    console.log('[Popup] Nenhuma aba ativa encontrada');
+            const tabs = await new Promise((r) => chrome.tabs.query({ active: true, currentWindow: true }, r));
+            if (!tabs || tabs.length === 0) {
+                console.log('[Popup] Nenhuma aba ativa encontrada');
+                return;
+            }
+            const tab = tabs[0];
+            if (tab && tab.url && tab.url.includes('lovable.dev')) {
+                console.log('[Popup] Solicitando token do content script e do background...');
+                const fromBg = await getTokenFromBackground();
+                if (fromBg) {
+                    applyTokenIfFound(fromBg, 'background');
                     return;
                 }
-                
-                const tab = tabs[0];
-                if (tab && tab.url && tab.url.includes('lovable.dev')) {
-                    console.log('[Popup] Enviando getToken para tab:', tab.id);
-                    
-                    chrome.tabs.sendMessage(tab.id, { action: 'getToken' }, (response) => {
-                        if (chrome.runtime.lastError) {
-                            console.log('[Popup] Erro ao enviar mensagem:', chrome.runtime.lastError.message);
-                            return;
-                        }
-                        
-                        if (response && response.token) {
-                            config.token = response.token;
-                            updateTokenDisplay(config.token);
-                            console.log('[Popup] Token obtido do content script:', config.token.substring(0, 20) + '...');
-                        } else {
-                            console.log('[Popup] Nenhum token retornado do content script');
-                        }
-                    });
-                } else {
-                    console.log('[Popup] Aba ativa não é lovable.dev');
-                }
-            });
+                chrome.tabs.sendMessage(tab.id, { action: 'getToken' }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.log('[Popup] Content script:', chrome.runtime.lastError.message);
+                        return;
+                    }
+                    if (response && response.token) applyTokenIfFound(response.token, 'content script');
+                    else console.log('[Popup] Nenhum token retornado do content script');
+                });
+            } else {
+                const fromBg = await getTokenFromBackground();
+                if (fromBg) applyTokenIfFound(fromBg, 'background');
+            }
         } catch (error) {
             console.error('[Popup] Erro ao solicitar token:', error);
         }
     }
-    
-    // Solicitar token do content script com delay para garantir que está injetado
+
+    // Polling: token pode ser capturado pelo background quando a página Lovable fizer a primeira requisição
+    function startTokenPolling() {
+        let attempts = 0;
+        const maxAttempts = 6;
+        const intervalMs = 1000;
+        const poll = async () => {
+            if (config.token) return;
+            attempts++;
+            const fromBg = await getTokenFromBackground();
+            if (fromBg) {
+                applyTokenIfFound(fromBg, 'background (polling)');
+                return;
+            }
+            const fromStorage = await chrome.storage.local.get(['lovable_token']);
+            if (fromStorage.lovable_token) {
+                applyTokenIfFound(fromStorage.lovable_token, 'storage (polling)');
+                return;
+            }
+            if (attempts < maxAttempts) setTimeout(poll, intervalMs);
+        };
+        setTimeout(poll, intervalMs);
+    }
+
+    // Solicitar token com delay para content script estar injetado; depois polling para pegar quando background capturar
     setTimeout(() => {
-        console.log('[Popup] Solicitando token do content script...');
         requestTokenFromContent();
+        startTokenPolling();
     }, 500);
 
     // Listen for storage changes in real-time

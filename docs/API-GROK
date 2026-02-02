@@ -1,0 +1,6 @@
+# Chaves de API Groq / OpenRouter
+# NÃO commitar chaves reais. Use variáveis de ambiente (.env) ou este arquivo local (já no .gitignore).
+# Exemplo de formato (substitua pelos seus valores locais):
+# API-luan93dutra: gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# API-luandutra.ia: gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# API-openrouter: sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

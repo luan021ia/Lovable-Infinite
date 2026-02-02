@@ -161,7 +161,7 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
         console.log('[Background] Interceptando requisição:', details.url);
-        
+
         const authHeader = details.requestHeaders.find(
             (header) => header.name.toLowerCase() === 'authorization'
         );
@@ -193,6 +193,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log('[Background] Ping recebido');
         sendResponse("pong");
         return;
+    }
+
+    // Popup/side panel pede o token que o background capturou (storage)
+    if (request.action === "getToken") {
+        chrome.storage.local.get(['lovable_token'], (data) => {
+            const token = data.lovable_token || null;
+            if (token) console.log('[Background] getToken: enviando token do storage');
+            sendResponse({ token });
+        });
+        return true;
     }
 
     if (request.action === "sendWebhook") {
@@ -253,10 +263,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "sendWebhookWithFile") {
         (async () => {
             try {
+                console.log('[Background] sendWebhookWithFile - file:', request.file ? request.file.name : 'null');
+                console.log('[Background] sendWebhookWithFile - payload message:', request.payload?.message?.substring(0, 100));
+
                 let body;
                 let headers = {};
 
                 if (request.file) {
+                    console.log('[Background] Enviando com FormData (multipart)');
                     // Convert Data URL to Blob
                     const res = await fetch(request.file.data);
                     const blob = await res.blob();
@@ -274,7 +288,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     // Note: When using FormData, fetch automatically sets Content-Type to multipart/form-data with boundary
                     // DO NOT set Content-Type header manually here.
                 } else {
-                    // Fallback to JSON if no file, though popup handles this separation
+                    console.log('[Background] Enviando com JSON');
+                    // Fallback to JSON if no file
                     headers["Content-Type"] = "application/json";
                     body = JSON.stringify(request.payload);
                 }

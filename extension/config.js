@@ -11,7 +11,9 @@ const CONFIG = {
     // Chave de desenvolvimento: válida por 30 dias, não usa Firebase (só para testar a extensão)
     // Em produção, remova ou altere esta chave.
     DEV_LICENSE_KEY: 'MLI-DEV-30DIAS-TESTE',
-    DEV_LICENSE_DAYS: 30
+    DEV_LICENSE_DAYS: 30,
+    // URL da API do melhorador de prompt (Vercel)
+    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt'
 };
 
 let licenseCache = {};

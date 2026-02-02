@@ -22,8 +22,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         lifetimeCheckbox.addEventListener('change', toggleExpiryVisibility);
     }
 
-    // Verificar protecao com senha
-    checkAdminPassword();
+    // Acesso direto ao painel (sem senha)
+    initializePanel();
 });
 
 // Senha padrão na primeira vez (210293)
@@ -140,6 +140,7 @@ function hidePasswordModal() {
  */
 async function verifyAdminAccess() {
     const passInput = document.getElementById('access-password');
+    const btn = document.getElementById('btn-verify-password');
     const password = (passInput && passInput.value) || '';
 
     if (!password) {
@@ -147,16 +148,52 @@ async function verifyAdminAccess() {
         return;
     }
 
-    try {
-        const storedPassword = await getAdminPasswordFromCloud();
+    // Feedback visual: desabilitar botão e mostrar "Verificando..."
+    const originalText = btn ? btn.textContent : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Verificando...';
+    }
 
-        if (!storedPassword) {
-            alert('Nenhuma senha configurada.');
+    try {
+        const PASSWORD_TIMEOUT_MS = 15000;
+        let storedPassword = await Promise.race([
+            getAdminPasswordFromCloud(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Servidor não respondeu em 15 segundos. Verifique a conexão.')), PASSWORD_TIMEOUT_MS)
+            )
+        ]);
+
+        // Normalizar: Firebase às vezes devolve string com aspas ou objeto
+        if (storedPassword && typeof storedPassword === 'object' && storedPassword !== null) {
+            storedPassword = storedPassword.value != null ? String(storedPassword.value) : (storedPassword['.value'] != null ? String(storedPassword['.value']) : null);
+        }
+        if (storedPassword != null && typeof storedPassword !== 'string') {
+            storedPassword = String(storedPassword).trim();
+        }
+        if (storedPassword === '') storedPassword = null;
+
+        const passwordHash = btoa(password);
+        const isSeedPassword = (password.trim() === '210293');
+
+        // Se não tem senha no servidor MAS o usuário digitou a senha padrão (210293), aceitar e salvar no Firebase
+        if (!storedPassword && isSeedPassword) {
+            console.log('[Admin] Senha padrão aceita (servidor sem senha). Salvando no Firebase...');
+            passwordVerified = true;
+            saveAdminSession();
+            hidePasswordModal();
+            if (passInput) passInput.value = '';
+            initializePanel();
+            saveAdminPasswordToCloud(ADMIN_SEED_PASSWORD_HASH).catch(() => {});
             return;
         }
 
-        const passwordHash = btoa(password);
-        if (passwordHash === storedPassword) {
+        if (!storedPassword) {
+            alert('Nenhuma senha configurada no servidor. Use a senha padrão 210293 para entrar na primeira vez.');
+            return;
+        }
+
+        if (passwordHash === storedPassword || (isSeedPassword && storedPassword === ADMIN_SEED_PASSWORD_HASH)) {
             console.log('[Admin] Senha correta!');
             passwordVerified = true;
             saveAdminSession(); // Manter login por 30 dias
@@ -172,7 +209,12 @@ async function verifyAdminAccess() {
         }
     } catch (error) {
         console.error('[Admin] Erro ao verificar senha:', error);
-        alert('Erro ao verificar senha: ' + error.message);
+        alert('Erro ao verificar senha: ' + (error.message || error) + '\n\nVerifique:\n- Conexão com a internet\n- Se o Firebase está configurado em firebase-config.js\n- Regras do Realtime Database (leitura em /admin/password)');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
     }
 }
 

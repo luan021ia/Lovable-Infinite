@@ -530,6 +530,39 @@ body::before {
   color: var(--text-secondary);
 }
 
+/* Estado "melhorando prompt": input bloqueado (readOnly no JS), sem pointer-events para o valor atualizar na tela */
+#message-input.improving {
+  opacity: 0.9;
+  cursor: wait;
+}
+
+/* Botão Melhorar prompt: mostrar ícone ou spinner */
+.improve-prompt-spinner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.action-btn.loading .improve-prompt-icon {
+  display: none;
+}
+
+.action-btn.loading .improve-prompt-spinner {
+  display: flex !important;
+}
+
+.spinner-svg {
+  animation: improve-spin 0.9s linear infinite;
+}
+
+@keyframes improve-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Actions Row */
 .input-actions-row {
   display: flex;
