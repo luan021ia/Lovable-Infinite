@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!text && !file) return;
 
         if (!config.webhookUrl) {
-            addSystemMessage('Erro: Webhook URL não configurada.');
+            console.error('[Popup] Erro: Webhook URL não configurada.');
             return;
         }
 
@@ -488,8 +488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('[DEBUG sendMessage] config.projectId:', config.projectId || 'VAZIO');
 
         if (!config.token || !config.projectId) {
-            console.log('[DEBUG sendMessage] ERRO: Token ou projectId ausentes!');
-            addSystemMessage('Alerta: Token ou ID do projeto ausentes. Dê um refresh na página do Lovable e tente de novo.');
+            console.warn('[Popup] Token ou ID do projeto ausentes. Dê um refresh na página do Lovable e tente de novo.');
             return;
         }
 
@@ -516,7 +515,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     reader.readAsDataURL(file);
                 });
             } catch (e) {
-                addSystemMessage("Erro ao processar arquivo: " + e.message);
+                console.error('[Popup] Erro ao processar arquivo:', e.message);
                 return;
             }
         }
@@ -545,22 +544,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }, (response) => {
                     console.log('[DEBUG sendMessage] Resposta do webhook:', JSON.stringify(response));
                     if (chrome.runtime.lastError) {
-                        console.log('[DEBUG sendMessage] chrome.runtime.lastError:', chrome.runtime.lastError.message);
-                        addSystemMessage("Erro: " + chrome.runtime.lastError.message);
+                        console.error('[Popup] Erro:', chrome.runtime.lastError.message);
                         return;
                     }
                     if (response && response.success) {
-                        console.log('[DEBUG sendMessage] Sucesso! response.data:', JSON.stringify(response.data));
+                        console.log('[Popup] Mensagem enviada com sucesso.');
                         const json = response.data || {};
-                        if (json.reply) addSystemMessage(json.reply);
-                        else addSystemMessage('Mensagem enviada com sucesso!');
+                        if (json.reply) console.log('[Popup] Resposta:', json.reply);
                     } else {
-                        console.log('[DEBUG sendMessage] Falha! response.error:', response?.error);
-                        addSystemMessage(`Erro ao enviar: ${response.error || 'Desconhecido'}`);
+                        console.error('[Popup] Erro ao enviar:', response?.error || 'Desconhecido');
                     }
                 });
             } catch (error) {
-                addSystemMessage(`Erro interno: ${error.message}`);
+                console.error('[Popup] Erro interno:', error.message);
             }
         };
 
@@ -568,7 +564,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Envio único: o que está no input (digitado ou colocado pelo Melhorar prompt) + anexo se houver. Sem lógica especial.
             doSend();
         } catch (error) {
-            addSystemMessage(`Erro interno: ${error.message}`);
+            console.error('[Popup] Erro interno:', error.message);
         }
     }
 
@@ -654,13 +650,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const text = messageInput.value.trim();
         if (!text) {
-            addSystemMessage('Digite algo para melhorar.');
+            console.warn('[Popup] Digite algo para melhorar.');
             messageInput.focus();
             return;
         }
         const endpoint = (typeof CONFIG !== 'undefined' && CONFIG.IMPROVE_PROMPT_ENDPOINT) ? CONFIG.IMPROVE_PROMPT_ENDPOINT : '';
         if (!endpoint) {
-            addSystemMessage('Melhorador de prompt não configurado (IMPROVE_PROMPT_ENDPOINT).');
+            console.warn('[Popup] Melhorador de prompt não configurado (IMPROVE_PROMPT_ENDPOINT).');
             return;
         }
         improvePromptBtn.disabled = true;
@@ -696,14 +692,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (errMsg && (errMsg.includes('resposta vazia') || errMsg.includes('Open Router retornou resposta vazia'))) {
                     errMsg = 'A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).';
                 }
-                addSystemMessage(errMsg);
+                console.error('[Popup] Erro ao melhorar prompt:', errMsg);
                 return;
             }
 
             if (isJson) {
                 const json = await response.json();
                 if (json.error) {
-                    addSystemMessage(json.error);
+                    console.error('[Popup] Erro da API:', json.error);
                     return;
                 }
                 const msg = json.text ?? json.choices?.[0]?.message?.content ?? json.choices?.[0]?.delta?.content ?? json.message ?? '';
@@ -754,11 +750,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 messageInput.scrollTop = messageInput.scrollHeight;
                 updateSendButtonState();
             } else {
-                addSystemMessage('A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).');
+                console.error('[Popup] A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).');
             }
             messageInput.focus();
         } catch (e) {
-            addSystemMessage('Erro: ' + (e.message || 'desconhecido'));
+            console.error('[Popup] Erro:', e.message || 'desconhecido');
         } finally {
             console.log('[DEBUG Enhanced] FINALLY - config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
             console.log('[DEBUG Enhanced] FINALLY - config.projectId:', config.projectId || 'VAZIO');

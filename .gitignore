@@ -4,6 +4,7 @@
 
 # Build da extensão (não commitar)
 extension/build/
+LOVABLE_INFINITY.zip
 
 # Pacote para sócio (gerado por npm run prepare-partner)
 extension-para-socio/

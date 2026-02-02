@@ -1,16 +1,23 @@
 /**
  * Build automatizado da extensão Chrome - Lovable Infinity
  * Ofusca os JS, copia arquivos e ajusta referências nos HTML.
+ * Ao final, compacta a pasta build em LOVABLE_INFINITY.zip.
  * Uso: npm run build (na raiz do projeto)
  */
 
 const fs = require('fs');
 const path = require('path');
+const archiver = require('archiver');
 
 // Raiz do projeto = pasta acima de scripts/
 const ROOT = path.resolve(__dirname, '..');
 const EXT = path.join(ROOT, 'extension');
 const BUILD = path.join(EXT, 'build');
+const ZIP_NAME = 'LOVABLE_INFINITY.zip';
+// ZIP na raiz do projeto; o conteúdo é sempre a pasta build (produção)
+const ZIP_PATH = path.join(ROOT, ZIP_NAME);
+// Nome da pasta dentro do ZIP: ao descompactar, o usuário terá "Lovable Infinity" com a extensão pronta
+const ZIP_FOLDER_NAME = 'Lovable Infinity';
 
 const OBFUSCATOR_OPTIONS = {
   compact: true,
@@ -30,12 +37,13 @@ const OBFUSCATE_LIST = [
   ['auth.js', 'auth.js'],
   ['popup.js', 'popup.js'],
   ['background.js', 'background.js'],
+  ['content.js', 'content.js'],
   ['firebase-config.js', 'c1.js'],
   ['license-manager.js', 'c2.js'],
 ];
 
 // Arquivos a copiar (sem ofuscar)
-const COPY_FILES = ['auth.html', 'popup.html', 'styles.css', 'manifest.json', 'content.js'];
+const COPY_FILES = ['auth.html', 'popup.html', 'styles.css', 'manifest.json'];
 
 function log(msg) {
   console.log(msg);
@@ -78,7 +86,7 @@ function replaceInFile(filePath, replacements) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
-function main() {
+async function main() {
   log('============================================');
   log(' BUILD DA EXTENSÃO CHROME - Lovable Infinity');
   log('============================================\n');
@@ -126,7 +134,7 @@ function main() {
   }
 
   // 4) Copiar arquivos não-JS
-  log('\n[*] Copiando arquivos (HTML, CSS, manifest, content.js)...');
+  log('\n[*] Copiando arquivos (HTML, CSS, manifest)...');
   COPY_FILES.forEach((name) => {
     const src = path.join(EXT, name);
     const dest = path.join(BUILD, name);
@@ -151,11 +159,34 @@ function main() {
   const iconsDest = path.join(BUILD, 'ICONS');
   copyDirSync(iconsSrc, iconsDest);
 
+  // 7) Compactar a pasta build em LOVABLE_INFINITY.zip (ZIP na raiz do projeto)
+  if (fs.existsSync(ZIP_PATH)) {
+    fs.unlinkSync(ZIP_PATH);
+    log('[*] ZIP anterior removido.');
+  }
+  log('\n[*] Criando ' + ZIP_NAME + ' (conteúdo: pasta build)...');
+  try {
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(ZIP_PATH);
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      output.on('close', () => resolve());
+      archive.on('error', (err) => reject(err));
+      output.on('error', (err) => reject(err));
+      archive.pipe(output);
+      archive.directory(BUILD, ZIP_FOLDER_NAME);
+      archive.finalize();
+    });
+  } catch (err) {
+    log('[ERRO] Falha ao compactar: ' + err.message);
+    process.exit(1);
+  }
+
   log('\n============================================');
   log(' CONCLUÍDO COM SUCESSO');
   log('============================================\n');
   log(`[+] Build criado em: extension\\build\\`);
-  log('[+] Carregue a pasta "extension\\build" no Chrome para testar ou distribuir.\n');
+  log('[+] ZIP gerado na raiz: ' + ZIP_NAME);
+  log('[+] Ao descompactar o ZIP, o usuário terá a pasta "' + ZIP_FOLDER_NAME + '" pronta para carregar no Chrome.\n');
 }
 
 main();
