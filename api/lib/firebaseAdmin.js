@@ -8,7 +8,10 @@ let adminApp = null;
 function getAdminApp() {
   if (adminApp) return adminApp;
   const raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
-  if (!raw) return null;
+  if (!raw) {
+    console.error('[firebaseAdmin] FIREBASE_SERVICE_ACCOUNT_JSON não configurada');
+    return null;
+  }
   try {
     const serviceAccount = JSON.parse(raw);
     const admin = require('firebase-admin');
@@ -22,6 +25,7 @@ function getAdminApp() {
     adminApp = admin;
     return admin;
   } catch (e) {
+    console.error('[firebaseAdmin] Erro ao inicializar Firebase Admin:', e);
     return null;
   }
 }
@@ -50,17 +54,26 @@ async function verifyMasterToken(req) {
   let decoded;
   try {
     decoded = await auth.verifyIdToken(token);
-  } catch (_) {
+  } catch (err) {
+    console.error('[verifyMasterToken] Token inválido ou expirado:', err);
     return { ok: false, status: 401 };
   }
   const callerEmail = (decoded.email || '').trim().toLowerCase();
+  if (!callerEmail) {
+    console.warn('[verifyMasterToken] Token decodificado sem email:', decoded);
+    return { ok: false, status: 403 };
+  }
   const masterEmails = getMasterEmails();
   const isMaster = masterEmails.indexOf(callerEmail) !== -1;
-  if (!isMaster) return { ok: false, status: 403 };
+  if (!isMaster) {
+    console.warn('[verifyMasterToken] Email não autorizado:', callerEmail, 'Master emails:', masterEmails);
+    return { ok: false, status: 403 };
+  }
   return { ok: true, decoded };
 }
 
 const PANEL_USERS_PATH = 'panelUsers';
+const LICENSES_PATH = 'licenses';
 
 async function getPanelUserRef(uid) {
   const db = getDatabase();
@@ -78,27 +91,40 @@ async function getPanelUser(uid) {
 async function setPanelUser(uid, data) {
   const ref = await getPanelUserRef(uid);
   if (!ref) return false;
-  await ref.set(data);
-  return true;
+  try {
+    await ref.set(data);
+    return true;
+  } catch (err) {
+    console.error('[setPanelUser] Erro ao salvar usuário:', uid, err);
+    return false;
+  }
 }
 
 async function removePanelUser(uid) {
   const ref = await getPanelUserRef(uid);
   if (!ref) return false;
-  await ref.remove();
-  return true;
+  try {
+    await ref.remove();
+    return true;
+  } catch (err) {
+    console.error('[removePanelUser] Erro ao remover usuário:', uid, err);
+    return false;
+  }
 }
 
 async function listPanelUsersFromDb() {
   const db = getDatabase();
   if (!db) return [];
-  const snap = await db.ref(PANEL_USERS_PATH).once('value');
-  const val = snap.val();
-  if (!val || typeof val !== 'object') return [];
-  return Object.entries(val).map(([uid, v]) => ({ uid, ...v }));
+  try {
+    const snap = await db.ref(PANEL_USERS_PATH).once('value');
+    const val = snap.val();
+    if (!val || typeof val !== 'object') return [];
+    return Object.entries(val).map(([uid, v]) => ({ uid, ...v }));
+  } catch (err) {
+    console.error('[listPanelUsersFromDb] Erro ao listar usuários:', err);
+    return [];
+  }
 }
-
-const LICENSES_PATH = 'licenses';
 
 function getLicenseRef(key) {
   const db = getDatabase();
@@ -109,16 +135,26 @@ function getLicenseRef(key) {
 async function getLicense(key) {
   const ref = getLicenseRef(key);
   if (!ref) return null;
-  const snap = await ref.once('value');
-  return snap.val();
+  try {
+    const snap = await ref.once('value');
+    return snap.val();
+  } catch (err) {
+    console.error('[getLicense] Erro ao buscar licença:', key, err);
+    return null;
+  }
 }
 
 async function updateLicense(key, updates) {
   const ref = getLicenseRef(key);
   if (!ref) return false;
-  const merged = { ...updates, timestamp: new Date().toISOString() };
-  await ref.update(merged);
-  return true;
+  try {
+    const merged = { ...updates, timestamp: new Date().toISOString() };
+    await ref.update(merged);
+    return true;
+  } catch (err) {
+    console.error('[updateLicense] Erro ao atualizar licença:', key, err);
+    return false;
+  }
 }
 
 module.exports = {
@@ -133,4 +169,5 @@ module.exports = {
   listPanelUsersFromDb,
   getLicense,
   updateLicense,
+  parseBody,
 };

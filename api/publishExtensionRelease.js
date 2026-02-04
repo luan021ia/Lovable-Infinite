@@ -106,6 +106,7 @@ module.exports = async function handler(req, res) {
     await db.ref('extensionRelease/current').set(payload);
     return res.status(200).json({ success: true, message: 'Versão publicada.' });
   } catch (err) {
+    console.error('[publishExtensionRelease] Erro inesperado:', err);
     return res.status(500).json({ error: GENERIC_ERROR });
   }
 };

@@ -1,13 +1,13 @@
 /**
  * Build automatizado da extensão Chrome - Lovable Infinity
- * Ciclo completo: commit → push → build (ofuscar, zip, version.json) → deploy Firebase + Vercel.
+ * Ofusca os JS, copia arquivos e ajusta referências nos HTML.
+ * Ao final, compacta a pasta build em LOVABLE_INFINITY.zip.
  * Uso: npm run build (na raiz do projeto)
  */
 
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
-const { execSync } = require('child_process');
 
 // Raiz do projeto = pasta acima de scripts/
 const ROOT = path.resolve(__dirname, '..');
@@ -86,59 +86,21 @@ function replaceInFile(filePath, replacements) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
-function run(cmd, opts = {}) {
-  try {
-    execSync(cmd, { stdio: 'inherit', cwd: ROOT, ...opts });
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
 async function main() {
   log('============================================');
   log(' BUILD DA EXTENSÃO CHROME - Lovable Infinity');
-  log(' Ciclo completo: commit → push → build → deploy');
   log('============================================\n');
 
+  // 0) Propagar versão de package.json para extension/manifest.json (fonte única de versão)
   const pkgPath = path.join(ROOT, 'package.json');
-  let version = '1.0.0';
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    version = (pkg.version && String(pkg.version).trim()) || version;
-  }
-
-  // 0) Git: add, commit e push (antes da build)
-  log('[*] Git: add + commit + push...');
-  run('git add -A');
-  let status = '';
-  try {
-    status = execSync('git status --short', { encoding: 'utf8', cwd: ROOT });
-  } catch (_) {
-    status = '';
-  }
-  if (status && status.trim()) {
-    if (run('git commit -m "chore: build e deploy automático (v' + version + ')"')) {
-      if (!run('git push')) {
-        log('[AVISO] git push falhou (remote/auth?). Build e deploy continuam.');
-      }
-    } else {
-      log('[AVISO] git commit falhou. Build e deploy continuam.');
-    }
-  } else {
-    log('[*] Nada para commitar (working tree limpo).');
-  }
-  log('');
-
-  // 1) Propagar versão de package.json para extension/manifest.json (fonte única de versão)
   const manifestPath = path.join(EXT, 'manifest.json');
   if (fs.existsSync(pkgPath) && fs.existsSync(manifestPath)) {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    const ver = (pkg.version && String(pkg.version).trim()) || '1.0.0';
+    const version = (pkg.version && String(pkg.version).trim()) || '1.0.0';
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    manifest.version = ver;
+    manifest.version = version;
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 4), 'utf8');
-    log('[*] Versão propagada para extension/manifest.json: ' + ver + '\n');
+    log('[*] Versão propagada para extension/manifest.json: ' + version + '\n');
   }
 
   // 1) Carregar ofuscador
@@ -250,18 +212,12 @@ async function main() {
 
   // 9) Deploy no Firebase Hosting (painel + ZIP disponível)
   log('\n[*] Executando deploy no Firebase (hosting)...');
-  if (!run('npx firebase deploy --only hosting')) {
-    log('[AVISO] Deploy Firebase falhou. Execute manualmente: firebase deploy --only hosting');
-  } else {
+  try {
+    const { execSync } = require('child_process');
+    execSync('npx firebase deploy --only hosting', { stdio: 'inherit', cwd: ROOT });
     log('[*] Deploy Firebase concluído.');
-  }
-
-  // 10) Deploy no Vercel (API)
-  log('\n[*] Executando deploy no Vercel (API)...');
-  if (!run('npx vercel --prod')) {
-    log('[AVISO] Deploy Vercel falhou. Execute manualmente: npx vercel --prod');
-  } else {
-    log('[*] Deploy Vercel concluído.');
+  } catch (err) {
+    log('[AVISO] Deploy Firebase falhou. Execute manualmente: firebase deploy --only hosting');
   }
 
   log('\n============================================');

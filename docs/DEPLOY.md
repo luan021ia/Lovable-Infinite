@@ -134,21 +134,6 @@ Se quiser usar **só** o admin hospedado (e não mais o `admin.html` local):
 
 O admin local e o admin no ar são o mesmo código e o mesmo Firebase; a diferença é só onde você abre a página.
 
-### 5. API no Vercel (createPanelUser) – 503?
-
-A aba **Administração** do painel chama a API `createPanelUser` (Vercel) para criar usuários de painel. Se a API responder **503**, a função não conseguiu inicializar o Firebase Admin — em geral por **variáveis de ambiente faltando no Vercel**.
-
-**O que fazer:**
-
-1. Acesse o [Vercel](https://vercel.com) → seu projeto da API (ex.: lovable-infinity-api).
-2. **Settings** → **Environment Variables**.
-3. Adicione:
-   - **FIREBASE_SERVICE_ACCOUNT_JSON** (obrigatório): JSON completo da conta de serviço do Firebase, em **uma única linha** (sem quebras). Para obter: Firebase Console → Configurações do projeto → Contas de serviço → Gerar nova chave privada → copie o conteúdo do JSON e cole no valor da variável (pode minificar em uma linha).
-   - **MASTER_EMAILS** (opcional): e-mails dos masters, separados por vírgula (ex.: `luan93dutra@gmail.com`). Se não definir, o código usa o padrão do projeto.
-4. Salve e faça um **redeploy** do projeto (Deployments → ⋮ no último deploy → Redeploy) para as variáveis passarem a valer.
-
-Depois disso, a chamada a `createPanelUser` deve deixar de retornar 503.
-
 ---
 
 ## Resumo das respostas diretas

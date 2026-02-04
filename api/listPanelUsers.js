@@ -1,10 +1,10 @@
 /**
  * GET /api/listPanelUsers
- * Lista usuários do painel (Firebase Auth + RTDB). Apenas master.
+ * Lista usuários do painel (RTDB). Apenas master.
  * Header: Authorization: Bearer <Firebase ID Token>
  */
 
-const { verifyMasterToken, listPanelUsersFromDb } = require('./lib/firebaseAdmin');
+const { verifyMasterToken, listPanelUsersFromDb, parseBody } = require('./lib/firebaseAdmin');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,13 +17,14 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido.' });
 
-  const authResult = await verifyMasterToken(req);
-  if (!authResult.ok) return res.status(authResult.status).json({ error: 'Não autorizado.' });
-
   try {
+    const authResult = await verifyMasterToken(req);
+    if (!authResult.ok) return res.status(authResult.status).json({ error: 'Não autorizado.' });
+
     const list = await listPanelUsersFromDb();
     return res.status(200).json({ success: true, users: list });
-  } catch (e) {
+  } catch (err) {
+    console.error('[listPanelUsers] Erro inesperado:', err);
     return res.status(500).json({ error: 'Erro ao listar usuários.' });
   }
 };

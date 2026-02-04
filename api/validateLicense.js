@@ -1,18 +1,31 @@
 /**
  * POST /api/validateLicense
- * Valida e ativa/atualiza sessão da licença via Firebase Admin SDK (bypass das regras RTDB).
+ * Valida e ativa/atualiza sessão da licença via Firebase Admin SDK.
  * Body: { licenseKey, deviceFingerprint }
- * Sem auth; a chave + device são o segredo.
  */
 
 const { getLicense, updateLicense } = require('./lib/firebaseAdmin');
 
-const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 min sem ping = sessão liberada
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function parseBody(req) {
+  const raw = req.body;
+  if (raw == null) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
 }
 
 function buildUserData(license) {
@@ -27,15 +40,9 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ valid: false, message: 'Método não permitido.' });
 
-  let licenseKey = '';
-  let deviceFingerprint = '';
-  try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    licenseKey = (body.licenseKey != null ? String(body.licenseKey) : '').trim();
-    deviceFingerprint = (body.deviceFingerprint != null ? String(body.deviceFingerprint) : '').trim();
-  } catch (_) {
-    return res.status(400).json({ valid: false, message: 'Dados inválidos.' });
-  }
+  const body = parseBody(req);
+  const licenseKey = (body.licenseKey != null ? String(body.licenseKey) : '').trim();
+  const deviceFingerprint = (body.deviceFingerprint != null ? String(body.deviceFingerprint) : '').trim();
 
   if (!licenseKey || !deviceFingerprint) {
     return res.status(400).json({ valid: false, message: 'licenseKey e deviceFingerprint obrigatórios.' });
@@ -46,16 +53,13 @@ module.exports = async function handler(req, res) {
     if (!cloudLicense || !cloudLicense.key) {
       return res.status(200).json({ valid: false, message: 'Licença não encontrada' });
     }
-
     if (!cloudLicense.active) {
       return res.status(200).json({ valid: false, message: 'Licença inativa' });
     }
-
     const expiryDate = new Date(cloudLicense.expiryDate);
     if (expiryDate < new Date()) {
       return res.status(200).json({ valid: false, message: 'Licença expirada' });
     }
-
     if (cloudLicense.maxUses != null && cloudLicense.maxUses !== '' && (cloudLicense.uses || 0) >= Number(cloudLicense.maxUses)) {
       return res.status(200).json({ valid: false, message: 'Limite de usos atingido' });
     }
@@ -70,7 +74,6 @@ module.exports = async function handler(req, res) {
         });
       }
     }
-
     if (cloudLicense.activatedDeviceFingerprint && cloudLicense.activatedDeviceFingerprint !== deviceFingerprint) {
       return res.status(200).json({
         valid: false,
@@ -109,6 +112,7 @@ module.exports = async function handler(req, res) {
       userData: buildUserData(cloudLicense)
     });
   } catch (err) {
+    console.error('[validateLicense] Erro inesperado:', err);
     return res.status(500).json({ valid: false, message: 'Erro ao validar licença.' });
   }
 };

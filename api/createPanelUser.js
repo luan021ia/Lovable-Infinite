@@ -2,11 +2,10 @@
  * POST /api/createPanelUser
  * Cria um usuário no Firebase Auth (e-mail/senha) e grava em RTDB. Apenas master autorizado.
  * Body: { email, password [, displayName, validUntil ] }
- * validUntil: -1 = sem expiração, ou timestamp (ms). Header: Authorization: Bearer <Firebase ID Token>
- * Env: FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_DATABASE_URL (opcional), MASTER_EMAILS (opcional)
+ * Header: Authorization: Bearer <Firebase ID Token>
  */
 
-const { getAdminAuth, verifyMasterToken, setPanelUser } = require('./lib/firebaseAdmin');
+const { getAdminAuth, verifyMasterToken, setPanelUser, parseBody } = require('./lib/firebaseAdmin');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -14,51 +13,31 @@ function cors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
-const GENERIC_ERROR = 'Não autorizado ou dados inválidos.';
-
 module.exports = async function handler(req, res) {
   cors(res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido.' });
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: GENERIC_ERROR });
-  }
-
-  let email = '';
-  let password = '';
-  let displayName = '';
-  let validUntil = -1;
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    email = (body.email != null ? String(body.email) : '').trim().toLowerCase();
-    password = body.password != null ? String(body.password) : '';
-    displayName = (body.displayName != null ? String(body.displayName) : '').trim();
+    const body = parseBody(req);
+    const email = (body.email != null ? String(body.email) : '').trim().toLowerCase();
+    const password = body.password != null ? String(body.password) : '';
+    const displayName = (body.displayName != null ? String(body.displayName) : '').trim();
+    let validUntil = -1;
     if (body.validUntil !== undefined && body.validUntil !== null && body.validUntil !== '') {
       validUntil = Number(body.validUntil);
       if (Number.isNaN(validUntil)) validUntil = -1;
     }
-  } catch (_) {
-    return res.status(400).json({ error: GENERIC_ERROR });
-  }
 
-  if (!email || !password || password.length < 6) {
-    return res.status(400).json({ error: GENERIC_ERROR });
-  }
+    if (!email) return res.status(400).json({ error: 'Informe o e-mail.' });
+    if (!password || password.length < 6) return res.status(400).json({ error: 'A senha deve ter no mínimo 6 caracteres.' });
 
-  const authResult = await verifyMasterToken(req);
-  if (!authResult.ok) {
-    return res.status(authResult.status).json({ error: GENERIC_ERROR });
-  }
+    const authResult = await verifyMasterToken(req);
+    if (!authResult.ok) return res.status(authResult.status).json({ error: 'Não autorizado. Faça login no painel.' });
 
-  const auth = getAdminAuth();
-  if (!auth) {
-    return res.status(503).json({ error: GENERIC_ERROR });
-  }
+    const auth = getAdminAuth();
+    if (!auth) return res.status(503).json({ error: 'Serviço indisponível. Configure FIREBASE_SERVICE_ACCOUNT_JSON no Vercel.' });
 
-  try {
     const userRecord = await auth.createUser({
       email,
       password,
@@ -69,7 +48,7 @@ module.exports = async function handler(req, res) {
 
     await auth.setCustomUserClaims(uid, { validUntil: validUntil === -1 ? -1 : validUntil, disabled: false });
 
-    await setPanelUser(uid, {
+    const saved = await setPanelUser(uid, {
       uid,
       email,
       displayName: displayName || email,
@@ -77,13 +56,16 @@ module.exports = async function handler(req, res) {
       disabled: false,
       createdAt: Date.now(),
     });
+    if (!saved) {
+      // usuário criado no Auth; RTDB falhou (ex.: DB não configurado) – ainda retornamos sucesso
+    }
 
     return res.status(200).json({ success: true, message: 'Acesso criado.', uid });
   } catch (err) {
+    console.error('[createPanelUser] Erro inesperado:', err);
     const code = err.code || '';
-    if (code === 'auth/email-already-exists' || code === 'auth/invalid-email') {
-      return res.status(400).json({ error: GENERIC_ERROR });
-    }
-    return res.status(500).json({ error: GENERIC_ERROR });
+    if (code === 'auth/email-already-in-use') return res.status(400).json({ error: 'Este e-mail já está cadastrado. Use outro ou recupere a senha.' });
+    if (code === 'auth/invalid-email') return res.status(400).json({ error: 'E-mail inválido.' });
+    return res.status(500).json({ error: 'Não foi possível criar o acesso. Tente novamente.' });
   }
 };

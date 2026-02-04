@@ -14,6 +14,10 @@ extension-para-socio/
 # Firebase cache
 .firebase/
 
+# Firebase Service Account JSON (credenciais sensíveis)
+**/lovable*-firebase-adminsdk-*.json
+docs/*-firebase-adminsdk-*.json
+
 # Node modules
 node_modules/
 
@@ -36,10 +40,6 @@ desktop.ini
 .env
 .env.local
 .env.*.local
-
-# Firebase service account (credenciais; usar variável no Vercel)
-**/lovable*-firebase-adminsdk-*.json
-docs/*-firebase-adminsdk-*.json
 
 # Temporários
 *.tmp
