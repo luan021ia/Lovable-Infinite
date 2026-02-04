@@ -11,6 +11,10 @@
     "masters": {
       ".read": "auth != null",
       ".write": false
+    },
+    "extensionRelease": {
+      ".read": true,
+      ".write": false
     }
   }
 }

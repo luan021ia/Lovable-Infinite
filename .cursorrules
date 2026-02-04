@@ -4,7 +4,8 @@
 
 - **Raiz limpa:** Na raiz ficam apenas configuração (package.json, firebase.json, .firebaserc, .gitignore, .cursorrules) e README. Nada na raiz sem necessidade.
 - **Sem duplicação:** Uma única fonte para cada coisa. Não criar arquivos duplicados (ex.: build.bat na raiz e em scripts; popup na raiz e em extension). Extensão em **extension/**, admin em **admin/**, scripts/ferramentas em **scripts/**, documentação em **docs/**.
-- **Build:** O único script de build é **scripts/build.bat** (chama npm run build, que usa scripts/build.js). Não criar build na raiz.
+- **Build:** O único script de build é **scripts/build.bat** (chama npm run build, que usa scripts/build.js). O build também executa **firebase deploy --only hosting** ao final. Não criar build na raiz.
+- **Versionamento (obrigatório):** A versão da extensão tem uma única fonte: **package.json** (campo `version`). Nunca alterar a versão manualmente em extension/manifest.json. Ao fazer alterações que caracterizem nova versão, atualizar `version` em package.json e rodar o build; o script propaga a versão para extension/manifest.json e para o build. Documentar a regra no README e em docs quando aplicável.
 - Seguir sempre **docs/ESTRUTURA_E_REGRAS_DO_PROJETO.md** para estrutura e regras de trabalho.
 
 ## Deploy automático (produção)

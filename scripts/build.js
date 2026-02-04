@@ -91,6 +91,18 @@ async function main() {
   log(' BUILD DA EXTENSÃO CHROME - Lovable Infinity');
   log('============================================\n');
 
+  // 0) Propagar versão de package.json para extension/manifest.json (fonte única de versão)
+  const pkgPath = path.join(ROOT, 'package.json');
+  const manifestPath = path.join(EXT, 'manifest.json');
+  if (fs.existsSync(pkgPath) && fs.existsSync(manifestPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const version = (pkg.version && String(pkg.version).trim()) || '1.0.0';
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    manifest.version = version;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 4), 'utf8');
+    log('[*] Versão propagada para extension/manifest.json: ' + version + '\n');
+  }
+
   // 1) Carregar ofuscador
   let JavaScriptObfuscator;
   try {
@@ -181,11 +193,39 @@ async function main() {
     process.exit(1);
   }
 
+  // 8) Copiar ZIP para admin/downloads (servido pelo Firebase Hosting no painel)
+  const adminDownloads = path.join(ROOT, 'admin', 'downloads');
+  fs.mkdirSync(adminDownloads, { recursive: true });
+  const zipDest = path.join(adminDownloads, ZIP_NAME);
+  copyFileSync(ZIP_PATH, zipDest);
+  log('[*] ZIP copiado para admin/downloads/ (para deploy no painel).');
+
+  // 8b) Gerar admin/version.json (versão + data do deploy para a barra do painel)
+  const versionPath = path.join(ROOT, 'admin', 'version.json');
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    const version = (pkg.version && String(pkg.version).trim()) || '1.0.0';
+    const versionPayload = { version: version, publishedAt: Date.now() };
+    fs.writeFileSync(versionPath, JSON.stringify(versionPayload, null, 0), 'utf8');
+    log('[*] admin/version.json gerado (versão ' + version + ', publishedAt: ' + versionPayload.publishedAt + ').');
+  }
+
+  // 9) Deploy no Firebase Hosting (painel + ZIP disponível)
+  log('\n[*] Executando deploy no Firebase (hosting)...');
+  try {
+    const { execSync } = require('child_process');
+    execSync('npx firebase deploy --only hosting', { stdio: 'inherit', cwd: ROOT });
+    log('[*] Deploy Firebase concluído.');
+  } catch (err) {
+    log('[AVISO] Deploy Firebase falhou. Execute manualmente: firebase deploy --only hosting');
+  }
+
   log('\n============================================');
   log(' CONCLUÍDO COM SUCESSO');
   log('============================================\n');
   log(`[+] Build criado em: extension\\build\\`);
   log('[+] ZIP gerado na raiz: ' + ZIP_NAME);
+  log('[+] ZIP copiado em: admin\\downloads\\' + ZIP_NAME);
   log('[+] Ao descompactar o ZIP, o usuário terá a pasta "' + ZIP_FOLDER_NAME + '" pronta para carregar no Chrome.\n');
 }
 

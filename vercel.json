@@ -10,6 +10,10 @@
     "api/createPanelUser.js": {
       "memory": 256,
       "maxDuration": 10
+    },
+    "api/publishExtensionRelease.js": {
+      "memory": 256,
+      "maxDuration": 10
     }
   }
 }

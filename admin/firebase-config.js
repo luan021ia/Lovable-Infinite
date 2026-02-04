@@ -16,17 +16,19 @@
  * Guia completo: pasta docs/FIREBASE_SETUP.md
  */
 
-/** URL do endpoint createPanelUser no Vercel (ex: https://seu-projeto.vercel.app/api/createPanelUser) */
-var CREATE_PANEL_USER_API_URL = "";
+/** URL do endpoint createPanelUser no Vercel */
+var CREATE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/createPanelUser";
+/** URL do endpoint publishExtensionRelease no Vercel */
+var PUBLISH_EXTENSION_RELEASE_API_URL = "https://lovable-infinity-api.vercel.app/api/publishExtensionRelease";
 
 const FIREBASE_CONFIG = {
-    apiKey: "",
-    authDomain: "",
+    apiKey: "AIzaSyA0ngBmNA0rx6413aJwYMbNDwt9nZKm5gg",
+    authDomain: "lovable2-e6f7f.firebaseapp.com",
     databaseURL: "https://lovable2-e6f7f-default-rtdb.firebaseio.com",
     projectId: "lovable2-e6f7f",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    storageBucket: "lovable2-e6f7f.firebasestorage.app",
+    messagingSenderId: "943057084101",
+    appId: "1:943057084101:web:c3e1f940b7c5fa2cbc1aac"
 };
 
 let firebaseApp = null;
@@ -62,7 +64,13 @@ async function initializeFirebase() {
 }
 
 function getFirebaseAuth() {
-    return firebaseAuth || (typeof firebase !== 'undefined' && firebase.app && firebase.auth ? firebase.auth() : null);
+    if (firebaseAuth) return firebaseAuth;
+    if (!firebaseApp || typeof firebase === 'undefined' || !firebase.auth) return null;
+    try {
+        return firebase.auth();
+    } catch (e) {
+        return null;
+    }
 }
 
 /**

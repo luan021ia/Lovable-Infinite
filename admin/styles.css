@@ -866,23 +866,11 @@ body.admin-page .admin-main {
   scroll-behavior: smooth;
 }
 
-body.admin-page .admin-main .section {
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-body.admin-page .admin-main .stat-card {
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-}
 
 body.admin-page .admin-main .license-table tbody tr {
   transition: background 0.12s ease;
 }
 
-body.admin-page .modal .modal-content {
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-}
 
 /* Mobile: padding reduzido; stats 2 colunas; tabela via wrapper (scroll horizontal); touch targets 44px */
 @media (max-width: 640px) {

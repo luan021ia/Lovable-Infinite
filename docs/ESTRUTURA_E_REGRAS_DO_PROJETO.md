@@ -81,11 +81,18 @@ Não mudar isso sem intenção de mudar a forma de publicar o admin; senão o si
 
 ### 3.5. Build da extensão
 
-O **único** script de build é **scripts/build.bat**. Ele sobe para a raiz do projeto, instala dependências (npm install) e executa o build (npm run build), que usa **scripts/build.js** para ofuscar os JS da pasta **extension/** e gerar **extension/build/**.  
+O **único** script de build é **scripts/build.bat**. Ele sobe para a raiz do projeto, instala dependências (npm install) e executa o build (npm run build), que usa **scripts/build.js** para: (1) propagar a versão de **package.json** para **extension/manifest.json**; (2) ofuscar os JS da pasta **extension/** e gerar **extension/build/**; (3) compactar em ZIP na raiz e copiar para **admin/downloads/**; (4) executar **firebase deploy --only hosting** ao final (painel + ZIP ficam no ar).  
 Na build, **firebase-config.js** e **license-manager.js** são ofuscados e gravados com **nomes neutros** (c1.js e c2.js); os HTML da build referenciam c1.js e c2.js.  
 Para distribuir a extensão, usar a pasta **extension/build** no Chrome (ou empacotar essa pasta).  
 Não commitar **extension/build/** no Git (já está no .gitignore).  
 Não criar outro build.bat na raiz nem duplicar o script de build; manter tudo em **scripts/**.
+
+### 3.5.1. Versionamento da extensão (obrigatório)
+
+A **versão** da extensão tem **uma única fonte**: o campo **version** em **package.json** (na raiz).  
+**Nunca** alterar a versão manualmente em **extension/manifest.json**.  
+Ao fazer alterações que caracterizem nova versão: (1) atualizar **version** em **package.json** (ex.: de `3.1` para `3.2`); (2) rodar o build (npm run build); o script copia essa versão para **extension/manifest.json** e para o build.  
+O README na raiz e o .cursorrules descrevem essa regra; mantê-la evita esquecer de atualizar o manifest ou o README.
 
 ### 3.6. Não quebrar o que já funciona
 

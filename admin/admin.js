@@ -87,12 +87,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         errEl.classList.remove('show');
         if (btn) { btn.disabled = true; btn.textContent = 'Entrando...'; }
+        var emailLower = email.toLowerCase();
+        var isMasterEmail = MASTER_EMAILS.some(function (m) { return m.toLowerCase() === emailLower; });
         try {
             await auth.signInWithEmailAndPassword(email, password);
             errEl.classList.remove('show');
         } catch (err) {
-            errEl.textContent = err.message || 'Falha no login. Verifique e-mail e senha.';
-            errEl.classList.add('show');
+            var code = (err && err.code) || '';
+            var msg = (err && err.message) ? String(err.message) : '';
+            var isProviderDisabled = code === 'auth/operation-not-allowed' || /OPERATION_NOT_ALLOWED|not allowed|disabled|não está habilitado/i.test(msg);
+            if (isProviderDisabled) {
+                errEl.innerHTML = 'Login por e-mail/senha ainda não está habilitado. <a href="https://console.firebase.google.com/project/lovable2-e6f7f/authentication/providers" target="_blank" rel="noopener">Habilite no Firebase Console</a> (Authentication &gt; Sign-in method &gt; E-mail/senha).';
+                errEl.classList.add('show');
+            } else if (isMasterEmail) {
+                try {
+                    if (btn) { btn.textContent = 'Criando conta...'; }
+                    await auth.createUserWithEmailAndPassword(email, password);
+                    errEl.classList.remove('show');
+                } catch (createErr) {
+                    var createCode = (createErr && createErr.code) || '';
+                    var createMsg = (createErr && createErr.message) ? String(createErr.message) : '';
+                    if (createCode === 'auth/email-already-in-use') {
+                        errEl.textContent = 'Senha incorreta. Essa conta já existe.';
+                        errEl.classList.add('show');
+                    } else if (createCode === 'auth/operation-not-allowed' || /OPERATION_NOT_ALLOWED|not allowed|disabled/i.test(createMsg)) {
+                        errEl.innerHTML = 'Login por e-mail/senha ainda não está habilitado. <a href="https://console.firebase.google.com/project/lovable2-e6f7f/authentication/providers" target="_blank" rel="noopener">Habilite no Firebase Console</a>.';
+                        errEl.classList.add('show');
+                    } else {
+                        errEl.textContent = (createErr && createErr.message) || 'Não foi possível criar a conta.';
+                        errEl.classList.add('show');
+                    }
+                }
+            } else {
+                errEl.textContent = msg || 'Falha no login. Verifique e-mail e senha.';
+                errEl.classList.add('show');
+            }
         }
         if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
     });
@@ -123,6 +152,7 @@ function applyMasterUI() {
 function initializePanel() {
     setupEventListeners();
     loadMain();
+    checkExtensionRelease();
 }
 
 function setupEventListeners() {
@@ -154,6 +184,82 @@ function setupEventListeners() {
     });
 
     document.getElementById('btn-create-panel-user')?.addEventListener('click', createPanelUserSubmit);
+    document.getElementById('btn-publish-release')?.addEventListener('click', publishReleaseSubmit);
+
+    document.getElementById('modal-extension-release-close')?.addEventListener('click', closeExtensionReleaseModal);
+    document.getElementById('modal-extension-release-dismiss')?.addEventListener('click', closeExtensionReleaseModal);
+    document.getElementById('modal-extension-release-download')?.addEventListener('click', function () { window.location.href = '/downloads/LOVABLE_INFINITY.zip'; });
+    document.getElementById('btn-download-extension')?.addEventListener('click', function () {
+        window.location.href = '/downloads/LOVABLE_INFINITY.zip';
+    });
+}
+
+const RELEASE_STORAGE_KEY = 'lovable_lastSeenReleaseVersion';
+
+function formatReleaseDate(publishedAt) {
+    if (publishedAt == null) return '—';
+    try {
+        var d = new Date(typeof publishedAt === 'number' ? publishedAt : parseInt(publishedAt, 10));
+        if (isNaN(d.getTime())) return '—';
+        return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return '—'; }
+}
+
+function loadReleaseIntoBar(release) {
+    var versionEl = document.getElementById('extension-version');
+    var dateEl = document.getElementById('extension-updated-at');
+    if (versionEl) versionEl.textContent = (release && release.version != null) ? String(release.version) : '—';
+    if (dateEl) dateEl.textContent = (release && release.publishedAt != null) ? formatReleaseDate(release.publishedAt) : '—';
+}
+
+function getReleaseModalEl() {
+    return document.getElementById('modal-extension-release');
+}
+
+function closeExtensionReleaseModal() {
+    var modal = getReleaseModalEl();
+    if (modal) modal.classList.remove('show');
+    if (window._lastExtensionReleaseKey) {
+        try { localStorage.setItem(RELEASE_STORAGE_KEY, window._lastExtensionReleaseKey); } catch (e) {}
+    }
+}
+
+async function checkExtensionRelease() {
+    var release = null;
+    try {
+        if (typeof firebaseRequest === 'function') {
+            release = await firebaseRequest('/extensionRelease/current');
+        }
+    } catch (e) {}
+    var hasRelease = release && (release.version !== undefined || release.publishedAt !== undefined);
+    if (hasRelease) {
+        loadReleaseIntoBar(release);
+        var currentKey = (release.version != null ? String(release.version) : '') + '_' + (release.publishedAt != null ? String(release.publishedAt) : '');
+        if (currentKey && currentKey !== '_') {
+            var lastSeen = '';
+            try { lastSeen = localStorage.getItem(RELEASE_STORAGE_KEY) || ''; } catch (e) {}
+            if (lastSeen !== currentKey) {
+                window._lastExtensionReleaseKey = currentKey;
+                var msgEl = document.getElementById('modal-extension-release-message');
+                if (msgEl && release.message) msgEl.textContent = release.message;
+                else if (msgEl) msgEl.textContent = 'Baixe a nova versão no botão abaixo.';
+                var modal = getReleaseModalEl();
+                if (modal) modal.classList.add('show');
+            }
+        }
+        return;
+    }
+    try {
+        var res = await fetch('/version.json');
+        if (res.ok) {
+            var fallback = await res.json();
+            if (fallback && (fallback.version != null || fallback.publishedAt != null)) {
+                loadReleaseIntoBar({ version: fallback.version, publishedAt: fallback.publishedAt });
+                return;
+            }
+        }
+    } catch (e) {}
+    loadReleaseIntoBar(null);
 }
 
 async function createPanelUserSubmit() {
@@ -208,6 +314,43 @@ async function createPanelUserSubmit() {
         if (errEl) { errEl.textContent = 'Erro de conexão. Verifique a URL da API.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
     }
     if (btn) { btn.disabled = false; btn.textContent = 'Gerar acesso'; }
+}
+
+async function publishReleaseSubmit() {
+    var versionEl = document.getElementById('release-version');
+    var messageEl = document.getElementById('release-message');
+    var errEl = document.getElementById('release-error');
+    var btn = document.getElementById('btn-publish-release');
+    var version = (versionEl && versionEl.value || '').trim();
+    var message = (messageEl && messageEl.value || '').trim();
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    var apiUrl = typeof PUBLISH_EXTENSION_RELEASE_API_URL !== 'undefined' ? PUBLISH_EXTENSION_RELEASE_API_URL : '';
+    if (!apiUrl) {
+        if (errEl) { errEl.textContent = 'Configure PUBLISH_EXTENSION_RELEASE_API_URL no firebase-config.js.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    if (!currentUser) {
+        if (errEl) { errEl.textContent = 'Sessão expirada. Faça login novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Publicando...'; }
+    try {
+        var token = await currentUser.getIdToken();
+        var res = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ version: version || undefined, message: message || undefined })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.success) {
+            showAlert('Versão publicada. Os usuários verão o pop-up na próxima vez que abrirem o painel.', 'success');
+        } else {
+            if (errEl) { errEl.textContent = data.error || 'Não foi possível publicar. Tente novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        }
+    } catch (e) {
+        if (errEl) { errEl.textContent = 'Erro de conexão. Verifique a URL da API.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Publicar nova versão'; }
 }
 
 async function loadMain() {

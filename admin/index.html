@@ -5,73 +5,79 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Admin - Lovable Infinity</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%231e293b'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='%236366f1'>∞</text></svg>">
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* Tema escuro – layout full-width; contraste garantido para leitura tranquila */
-        body.admin-page { width: 100%; min-height: 100vh; height: 100vh; background: #0f172a; color: #f1f5f9; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
-        body.admin-page::before { display: none; }
-        .admin-topbar { width: 100%; height: 64px; padding: 0 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; background: #1e293b; border-bottom: 1px solid #334155; flex-shrink: 0; }
-        .admin-topbar h1 { font-size: 20px; font-weight: 600; margin: 0; color: #f1f5f9; letter-spacing: -0.02em; }
-        .admin-topbar-desc { color: #94a3b8; font-size: 13px; font-weight: 400; margin: 2px 0 0 0; }
-        .admin-topbar .btn-cta { padding: 10px 24px; font-size: 14px; font-weight: 600; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s, box-shadow 0.2s; }
-        .admin-topbar .btn-cta:hover { background: #4f46e5; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4); }
-        .admin-main { width: 100%; max-width: 1600px; margin: 0 auto; padding: 32px 40px 48px; box-sizing: border-box; }
-        .section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-        .section h2 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: #f1f5f9; letter-spacing: -0.01em; line-height: 1.4; }
-        .form-group { margin-bottom: 18px; }
-        .form-group label { display: block; font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; text-transform: none; letter-spacing: 0; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f1f5f9; font-family: inherit; font-size: 14px; box-sizing: border-box; transition: border-color 0.15s, box-shadow 0.15s; }
-        .form-group input::placeholder, .form-group textarea::placeholder { color: #64748b; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
-        .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; text-transform: none; font-weight: 500; font-size: 14px; color: #e2e8f0; }
-        .checkbox-label input { width: auto; accent-color: #6366f1; }
+        /* Design system: glassmorphism, azul #60a5fa, cyan #06b6d4, fundos #121212 / #1f1f1f / #2a2a2a */
+        body.admin-page { width: 100%; min-height: 100vh; height: 100vh; background: #121212; color: #ffffff; margin: 0; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        body.admin-page::before { content: ''; position: fixed; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), rgba(6,182,212,0.03), rgba(96,165,250,0.05)); pointer-events: none; z-index: 0; }
+        .admin-topbar { width: 100%; height: 64px; padding: 0 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; position: relative; z-index: 1; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+        .admin-topbar::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(to right, transparent, rgba(96,165,250,0.3), transparent); }
+        .admin-topbar h1 { font-size: 20px; font-weight: 600; margin: 0; color: #ffffff; letter-spacing: -0.02em; }
+        .admin-topbar-desc { color: #d1d5db; font-size: 13px; font-weight: 400; margin: 2px 0 0 0; }
+        .admin-topbar .btn-cta { padding: 10px 24px; font-size: 14px; font-weight: 600; background: linear-gradient(to right, rgba(96,165,250,0.8), rgba(6,182,212,0.8)); color: #fff; border: none; border-radius: 12px; cursor: pointer; transition: all 0.2s; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(96,165,250,0.2); }
+        .admin-topbar .btn-cta:hover { background: linear-gradient(to right, #60a5fa, #06b6d4); box-shadow: 0 0 20px rgba(96,165,250,0.3); transform: scale(1.02); }
+        .admin-main { width: 100%; max-width: 1600px; margin: 0 auto; padding: 32px 40px 48px; box-sizing: border-box; position: relative; z-index: 1; }
+        .section { position: relative; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px 32px; margin-bottom: 24px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(96,165,250,0.1), 0 0 20px rgba(96,165,250,0.1); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); overflow: hidden; }
+        .section::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), transparent, rgba(6,182,212,0.05)); pointer-events: none; }
+        .section h2 { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: #ffffff; letter-spacing: -0.01em; line-height: 1.4; position: relative; }
+        .form-group { margin-bottom: 18px; position: relative; }
+        .form-group label { display: block; font-size: 12px; font-weight: 500; color: #9ca3af; margin-bottom: 6px; text-transform: none; letter-spacing: 0; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #ffffff; font-family: inherit; font-size: 14px; box-sizing: border-box; transition: all 0.2s; backdrop-filter: blur(10px); }
+        .form-group input::placeholder, .form-group textarea::placeholder { color: rgba(255,255,255,0.4); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: rgba(96,165,250,0.5); outline: none; box-shadow: 0 0 0 2px rgba(96,165,250,0.2); }
+        .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; text-transform: none; font-weight: 500; font-size: 14px; color: #d1d5db; }
+        .checkbox-label input { width: auto; accent-color: #60a5fa; }
         .button-group { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-size: 14px; }
-        .btn-primary { background: #6366f1; color: #fff; }
-        .btn-primary:hover { background: #4f46e5; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4); }
-        .btn-secondary { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
-        .btn-secondary:hover { background: #334155; border-color: #64748b; color: #f1f5f9; }
+        .btn { padding: 10px 20px; border: none; border-radius: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-size: 14px; }
+        .btn-primary { background: linear-gradient(to right, rgba(96,165,250,0.8), rgba(6,182,212,0.8)); color: #fff; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px rgba(96,165,250,0.2); }
+        .btn-primary:hover { background: linear-gradient(to right, #60a5fa, #06b6d4); box-shadow: 0 0 20px rgba(96,165,250,0.3); transform: scale(1.02); }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: #d1d5db; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: rgba(96,165,250,0.3); color: #ffffff; }
         .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
         .btn-danger:hover { background: rgba(239, 68, 68, 0.25); border-color: #f87171; color: #fecaca; }
         .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; margin-bottom: 32px; }
-        .stat-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 24px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: box-shadow 0.2s, border-color 0.2s; }
-        .stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.25); border-color: #475569; }
-        .stat-number { font-size: 28px; font-weight: 600; color: #f1f5f9; margin-bottom: 8px; letter-spacing: -0.02em; }
-        .stat-label { font-size: 12px; color: #94a3b8; font-weight: 500; text-transform: none; letter-spacing: 0; }
+        .stat-card { position: relative; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; text-align: center; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 0 20px rgba(96,165,250,0.1); transition: all 0.2s; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); overflow: hidden; }
+        .stat-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), transparent, rgba(6,182,212,0.05)); pointer-events: none; }
+        .stat-card:hover { box-shadow: 0 0 25px rgba(96,165,250,0.15); border-color: rgba(96,165,250,0.2); }
+        .stat-number { font-size: 28px; font-weight: 600; color: #ffffff; margin-bottom: 8px; letter-spacing: -0.02em; position: relative; }
+        .stat-label { font-size: 12px; color: #9ca3af; font-weight: 500; text-transform: none; letter-spacing: 0; position: relative; }
         .license-table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 13px; }
-        .license-table th { background: #0f172a; padding: 12px 16px; text-align: left; font-weight: 500; color: #94a3b8; border-bottom: 1px solid #334155; font-size: 11px; text-transform: none; letter-spacing: 0.02em; }
-        .license-table td { padding: 14px 16px; border-bottom: 1px solid #334155; color: #e2e8f0; }
-        .license-table tbody tr:hover { background: rgba(51, 65, 85, 0.4); }
+        .license-table th { background: #1f1f1f; padding: 12px 16px; text-align: left; font-weight: 500; color: #9ca3af; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 11px; text-transform: none; letter-spacing: 0.02em; }
+        .license-table td { padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); color: #d1d5db; }
+        .license-table tbody tr:hover { background: rgba(255,255,255,0.05); }
         .license-table tbody tr:last-child td { border-bottom: none; }
-        .status-badge-small { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; text-transform: none; }
-        .status-active { background: rgba(52, 211, 153, 0.2); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.4); }
+        .status-badge-small { display: inline-block; padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 500; text-transform: none; }
+        .status-active { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
         .status-inactive { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
-        .status-expiring { background: rgba(251, 191, 36, 0.2); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.4); }
-        .license-key { font-family: ui-monospace, monospace; background: #0f172a; color: #94a3b8; padding: 6px 10px; border-radius: 6px; font-size: 11px; word-break: break-all; user-select: all; border: 1px solid #334155; }
+        .status-expiring { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.4); }
+        .license-key { font-family: ui-monospace, monospace; background: #1f1f1f; color: #9ca3af; padding: 6px 10px; border-radius: 8px; font-size: 11px; word-break: break-all; user-select: all; border: 1px solid rgba(255,255,255,0.1); }
         .action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
-        .action-btn-small { padding: 6px 12px; font-size: 12px; background: #1e293b; border: 1px solid #475569; color: #e2e8f0; border-radius: 6px; cursor: pointer; transition: all 0.15s; font-weight: 500; }
-        .action-btn-small:hover { background: #334155; color: #f1f5f9; border-color: #64748b; }
+        .action-btn-small { padding: 6px 12px; font-size: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #d1d5db; border-radius: 8px; cursor: pointer; transition: all 0.15s; font-weight: 500; }
+        .action-btn-small:hover { background: rgba(255,255,255,0.1); color: #ffffff; border-color: rgba(96,165,250,0.3); }
         .action-btn-small.delete { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: rgba(239, 68, 68, 0.4); }
         .action-btn-small.delete:hover { background: rgba(239, 68, 68, 0.25); color: #fecaca; border-color: #f87171; }
-        .alert { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 14px; }
+        .alert { padding: 12px 16px; border-radius: 12px; margin-bottom: 16px; display: none; font-size: 14px; }
         .alert.show { display: block; }
-        .alert-success { background: rgba(52, 211, 153, 0.15); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.4); }
+        .alert-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
         .alert-error { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
-        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 9999; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
         .modal.show { display: flex; }
-        .modal-content { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 28px; max-width: 440px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        .modal-content { position: relative; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 28px; max-width: 440px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 30px rgba(96,165,250,0.1); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+        .modal-content::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), transparent, rgba(6,182,212,0.05)); pointer-events: none; border-radius: 24px; }
         .modal-content.modal-edit { max-width: 500px; }
-        .modal-header { font-size: 18px; font-weight: 600; color: #f1f5f9; margin-bottom: 20px; padding-right: 32px; letter-spacing: -0.01em; }
-        .modal-close { position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
-        .modal-close:hover { color: #f1f5f9; background: rgba(255,255,255,0.06); }
+        .modal-header { font-size: 18px; font-weight: 600; color: #ffffff; margin-bottom: 20px; padding-right: 32px; letter-spacing: -0.01em; position: relative; }
+        .modal-close { position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: #9ca3af; font-size: 20px; cursor: pointer; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; transition: color 0.2s, background 0.2s; }
+        .modal-close:hover { color: #ffffff; background: rgba(255,255,255,0.1); }
         .import-export-toggle { margin-bottom: 0; }
-        .import-export-body { display: none; padding-top: 20px; margin-top: 20px; border-top: 1px solid #334155; }
+        .import-export-body { display: none; padding-top: 20px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
         .import-export-body.show { display: block; }
-        .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); padding: 10px 20px; background: #1e293b; color: #f1f5f9; font-weight: 500; font-size: 13px; border-radius: 8px; border: 1px solid #475569; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 10001; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+        .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px); padding: 10px 20px; background: rgba(31,31,31,0.95); color: #ffffff; font-weight: 500; font-size: 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 25px rgba(0,0,0,0.3), 0 0 20px rgba(96,165,250,0.1); z-index: 10001; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; backdrop-filter: blur(24px); }
         .copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .modal-content #modal-message { color: #94a3b8; margin-bottom: 20px; line-height: 1.5; }
-        .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px 0 0; border-radius: 8px; }
+        .modal-content #modal-message { color: #9ca3af; margin-bottom: 20px; line-height: 1.5; position: relative; }
+        .modal-content .modal-release-message { color: #9ca3af; margin-bottom: 20px; line-height: 1.5; position: relative; }
+        .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -2px 0 0; border-radius: 12px; }
         .license-table { min-width: 720px; }
         @media (max-width: 768px) {
             .admin-topbar { padding: 0 24px; flex-wrap: wrap; height: auto; min-height: 64px; padding-top: 12px; padding-bottom: 12px; gap: 8px; }
@@ -85,25 +91,34 @@
             .modal-content { max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
             .copy-toast { bottom: max(24px, env(safe-area-inset-bottom)); }
         }
-        .login-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .login-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #121212; display: flex; align-items: center; justify-content: center; z-index: 10000; }
         .login-screen.hidden { display: none; }
-        .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-        .login-box h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 0 0 24px 0; text-align: center; }
-        .login-box .form-group { margin-bottom: 16px; }
-        .login-box .form-group label { display: block; font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; }
-        .login-box input { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f1f5f9; font-size: 14px; box-sizing: border-box; }
-        .login-box input:focus { border-color: #6366f1; outline: none; }
-        .login-box .btn-login { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
-        .login-box .btn-login:hover { background: #4f46e5; }
-        .login-box .login-error { color: #fca5a5; font-size: 13px; margin-top: 12px; display: none; }
+        .login-screen::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), rgba(6,182,212,0.03), rgba(96,165,250,0.05)); pointer-events: none; }
+        .login-box { position: relative; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 30px rgba(96,165,250,0.1); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); overflow: hidden; }
+        .login-box::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), transparent, rgba(6,182,212,0.05)); pointer-events: none; border-radius: 24px; }
+        .login-box h2 { font-size: 18px; font-weight: 600; color: #ffffff; margin: 0 0 24px 0; text-align: center; position: relative; }
+        .login-box .form-group { margin-bottom: 16px; position: relative; }
+        .login-box .form-group label { display: block; font-size: 12px; font-weight: 500; color: #9ca3af; margin-bottom: 6px; }
+        .login-box input { width: 100%; padding: 10px 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #ffffff; font-size: 14px; box-sizing: border-box; transition: all 0.2s; }
+        .login-box input:focus { border-color: rgba(96,165,250,0.5); outline: none; box-shadow: 0 0 0 2px rgba(96,165,250,0.2); }
+        .login-box .btn-login { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: linear-gradient(to right, rgba(96,165,250,0.8), rgba(6,182,212,0.8)); color: #fff; border: none; border-radius: 12px; cursor: pointer; margin-top: 8px; transition: all 0.2s; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px rgba(96,165,250,0.2); }
+        .login-box .btn-login:hover { background: linear-gradient(to right, #60a5fa, #06b6d4); box-shadow: 0 0 20px rgba(96,165,250,0.3); transform: scale(1.02); }
+        .login-box .login-error { color: #fca5a5; font-size: 13px; margin-top: 12px; display: none; position: relative; }
         .login-box .login-error.show { display: block; }
         .admin-panel-wrap { display: none; width: 100%; flex: 1; flex-direction: column; overflow: hidden; }
         .admin-panel-wrap.visible { display: flex; }
-        .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid #334155; padding: 0 40px; background: #1e293b; }
-        .admin-tabs .tab { padding: 12px 20px; font-size: 14px; font-weight: 500; color: #94a3b8; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
-        .admin-tabs .tab:hover { color: #e2e8f0; }
-        .admin-tabs .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+        .admin-tabs { display: flex; gap: 0; border: none; padding: 0; background: transparent; }
+        .admin-tabs .tab { padding: 10px 18px; font-size: 14px; font-weight: 500; color: #9ca3af; background: transparent; border: none; border-radius: 10px; cursor: pointer; margin: 0 2px; transition: color 0.2s, background 0.2s; }
+        .admin-tabs .tab:hover { color: #d1d5db; background: rgba(255,255,255,0.06); }
+        .admin-tabs .tab.active { color: #60a5fa; background: rgba(96,165,250,0.15); }
         .admin-tabs .tab.hidden { display: none; }
+        .extension-download-bar { display: flex; align-items: center; flex-wrap: nowrap; gap: 20px; flex-shrink: 0; margin-bottom: 20px; padding: 12px 24px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 0 16px rgba(96,165,250,0.08); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+        .extension-download-title { font-size: 14px; font-weight: 600; color: #ffffff; margin: 0; letter-spacing: -0.01em; white-space: nowrap; }
+        .extension-download-meta-item { font-size: 13px; color: #9ca3af; white-space: nowrap; }
+        .extension-download-meta-item strong { color: #d1d5db; font-weight: 600; }
+        .extension-download-bar .extension-download-btn { flex-shrink: 0; padding: 8px 18px; font-size: 13px; font-weight: 600; background: linear-gradient(to right, rgba(96,165,250,0.8), rgba(6,182,212,0.8)); color: #fff; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(96,165,250,0.2); }
+        .extension-download-bar .extension-download-btn:hover { background: linear-gradient(to right, #60a5fa, #06b6d4); box-shadow: 0 0 16px rgba(96,165,250,0.35); transform: scale(1.02); }
+        @media (max-width: 768px) { .extension-download-bar { flex-wrap: wrap; gap: 12px; padding: 12px 16px; } .extension-download-title { white-space: normal; } .extension-download-bar .extension-download-btn { width: 100%; } }
     </style>
 </head>
 
@@ -141,6 +156,13 @@
             <button type="button" class="btn btn-secondary" id="btn-logout">Sair</button>
         </div>
     </header>
+
+    <div class="extension-download-bar" id="extension-download-bar" role="region" aria-label="Download da extensão">
+        <span class="extension-download-title">Baixar extensão Lovable Infinity</span>
+        <span class="extension-download-meta-item">Versão <strong id="extension-version">—</strong></span>
+        <span class="extension-download-meta-item">Atualizado em <strong id="extension-updated-at">—</strong></span>
+        <button type="button" class="btn-cta extension-download-btn" id="btn-download-extension">Baixar extensão</button>
+    </div>
 
     <main class="admin-main" id="main-licenses">
         <div id="alert-main" class="alert" aria-live="polite"></div>
@@ -188,6 +210,22 @@
     </main>
 
     <main class="admin-main" id="main-admin" style="display: none;" aria-hidden="true">
+        <div class="section">
+            <h2>Publicar atualização da extensão</h2>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Após fazer o build e o deploy do painel, publique aqui para que todos os usuários vejam o pop-up de nova versão.</p>
+            <div class="form-group">
+                <label for="release-version">Versão (opcional)</label>
+                <input type="text" id="release-version" placeholder="Ex: 1.0.1" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="release-message">Mensagem (opcional)</label>
+                <input type="text" id="release-message" placeholder="Ex: Extensão atualizada. Baixe a nova versão." autocomplete="off">
+            </div>
+            <p id="release-error" class="alert alert-error" style="display: none;"></p>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="btn-publish-release">Publicar nova versão</button>
+            </div>
+        </div>
         <div class="section">
             <h2>Criar acesso ao painel</h2>
             <p style="color: #94a3b8; margin-bottom: 20px;">Cadastre um usuário para acessar o painel com e-mail e senha. Cada usuário terá seu próprio ambiente de licenças.</p>
@@ -307,6 +345,19 @@
             <div class="button-group">
                 <button type="button" class="btn btn-primary" id="btn-confirm">Confirmar</button>
                 <button type="button" class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Extensão atualizada -->
+    <div id="modal-extension-release" class="modal" role="dialog" aria-labelledby="modal-extension-release-title" aria-modal="true">
+        <div class="modal-content">
+            <button type="button" class="modal-close" id="modal-extension-release-close" aria-label="Fechar">×</button>
+            <h2 class="modal-header" id="modal-extension-release-title">Extensão atualizada</h2>
+            <p id="modal-extension-release-message" class="modal-release-message">Baixe a nova versão no botão abaixo.</p>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="modal-extension-release-download">Baixar extensão</button>
+                <button type="button" class="btn btn-secondary" id="modal-extension-release-dismiss">Fechar</button>
             </div>
         </div>
     </div>
