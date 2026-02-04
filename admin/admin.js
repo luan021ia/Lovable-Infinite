@@ -1,9 +1,10 @@
 /**
- * Painel de Admin - Página única: criar, editar, gerenciar licenças
+ * Painel de Admin - Multi-tenant com Firebase Auth
  */
 
 let currentAction = null;
 let allLicensesCache = [];
+let currentUser = null;
 
 const EXPIRING_DAYS = 30;
 
@@ -21,7 +22,18 @@ function isExpired(license) {
     return new Date(license.expiryDate) < new Date();
 }
 
+function getCurrentUser() {
+    return currentUser;
+}
+
+var MASTER_EMAILS = ['luan93dutra@gmail.com'];
+function isMasterUser() {
+    if (!currentUser || !currentUser.email) return false;
+    return MASTER_EMAILS.indexOf(currentUser.email.trim().toLowerCase()) !== -1;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    await initializeFirebase();
     await licenseManager.init();
 
     const lifetimeCheckbox = document.getElementById('create-license-lifetime');
@@ -40,119 +52,75 @@ document.addEventListener('DOMContentLoaded', async () => {
         editLifetimeCheck.addEventListener('change', toggleEdit);
     }
 
-    initializePanel();
-});
-
-const ADMIN_SEED_PASSWORD_HASH = 'MjEwMjkz';
-const ADMIN_SESSION_KEY = 'lovable_admin_session';
-const ADMIN_SESSION_DAYS = 30;
-const ADMIN_SESSION_MS = ADMIN_SESSION_DAYS * 24 * 60 * 60 * 1000;
-
-function _readSessionFrom(storage) {
-    try {
-        const raw = storage.getItem(ADMIN_SESSION_KEY);
-        if (!raw) return false;
-        const data = JSON.parse(raw);
-        return data && typeof data.ts === 'number' && (Date.now() - data.ts) < ADMIN_SESSION_MS;
-    } catch (e) { return false; }
-}
-
-function hasValidAdminSession() {
-    return _readSessionFrom(localStorage) || (typeof sessionStorage !== 'undefined' && _readSessionFrom(sessionStorage));
-}
-
-function saveAdminSession() {
-    const payload = JSON.stringify({ ts: Date.now() });
-    try { localStorage.setItem(ADMIN_SESSION_KEY, payload); } catch (e) {}
-    try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(ADMIN_SESSION_KEY, payload); } catch (e) {}
-}
-
-function clearAdminSession() {
-    try { localStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
-    try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(ADMIN_SESSION_KEY); } catch (e) {}
-}
-
-async function checkAdminPassword() {
-    try {
-        if (hasValidAdminSession()) {
-            initializePanel();
-            return;
-        }
-        const adminPassword = await getAdminPasswordFromCloud();
-        if (!adminPassword) {
-            await saveAdminPasswordToCloud(ADMIN_SEED_PASSWORD_HASH);
-        }
-        showPasswordModal();
-    } catch (error) {
-        console.error('[Admin] Erro ao verificar senha:', error);
-        showPasswordModal();
+    const auth = getFirebaseAuth();
+    if (!auth) {
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('login-error').textContent = 'Configure apiKey e authDomain no firebase-config.js para usar o login.';
+        document.getElementById('login-error').classList.add('show');
+        return;
     }
-}
 
-function showPasswordModal() {
-    const modal = document.getElementById('password-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    modal.classList.add('show');
-    const passInput = document.getElementById('access-password');
-    if (passInput) { passInput.value = ''; passInput.focus(); }
-}
-
-function hidePasswordModal() {
-    const modal = document.getElementById('password-modal');
-    if (modal) { modal.style.display = 'none'; modal.classList.remove('show'); }
-}
-
-async function verifyAdminAccess() {
-    const passInput = document.getElementById('access-password');
-    const btn = document.getElementById('btn-verify-password');
-    const password = (passInput && passInput.value) || '';
-    if (!password) { alert('Digite a senha!'); return; }
-    const originalText = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
-    try {
-        let storedPassword = await Promise.race([
-            getAdminPasswordFromCloud(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
-        ]);
-        if (storedPassword && typeof storedPassword === 'object' && storedPassword !== null) {
-            storedPassword = storedPassword.value != null ? String(storedPassword.value) : (storedPassword['.value'] != null ? String(storedPassword['.value']) : null);
-        }
-        if (storedPassword != null && typeof storedPassword !== 'string') storedPassword = String(storedPassword).trim();
-        if (storedPassword === '') storedPassword = null;
-        const passwordHash = btoa(password);
-        const isSeed = (password.trim() === '210293');
-        if (!storedPassword && isSeed) {
-            saveAdminSession();
-            hidePasswordModal();
-            if (passInput) passInput.value = '';
-            initializePanel();
-            saveAdminPasswordToCloud(ADMIN_SEED_PASSWORD_HASH).catch(() => {});
-            return;
-        }
-        if (!storedPassword) {
-            alert('Nenhuma senha configurada. Use 210293 na primeira vez.');
-            return;
-        }
-        if (passwordHash === storedPassword || (isSeed && storedPassword === ADMIN_SEED_PASSWORD_HASH)) {
-            saveAdminSession();
-            hidePasswordModal();
-            if (passInput) passInput.value = '';
+    auth.onAuthStateChanged(function (user) {
+        currentUser = user;
+        window.getAdminAuthToken = user ? function () { return user.getIdToken(); } : null;
+        if (user) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('admin-panel-wrap').classList.add('visible');
+            applyMasterUI();
             initializePanel();
         } else {
-            alert('Senha incorreta!');
-            if (passInput) { passInput.value = ''; passInput.focus(); }
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('admin-panel-wrap').classList.remove('visible');
         }
-    } catch (error) {
-        console.error('[Admin] Erro:', error);
-        alert('Erro ao verificar senha. Verifique a conexão e o Firebase.');
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = originalText; }
-    }
+    });
+
+    document.getElementById('login-form')?.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const email = document.getElementById('login-email')?.value?.trim() || '';
+        const password = document.getElementById('login-password')?.value || '';
+        const errEl = document.getElementById('login-error');
+        const btn = document.getElementById('btn-login-submit');
+        if (!email || !password) {
+            errEl.textContent = 'Preencha e-mail e senha.';
+            errEl.classList.add('show');
+            return;
+        }
+        errEl.classList.remove('show');
+        if (btn) { btn.disabled = true; btn.textContent = 'Entrando...'; }
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+            errEl.classList.remove('show');
+        } catch (err) {
+            errEl.textContent = err.message || 'Falha no login. Verifique e-mail e senha.';
+            errEl.classList.add('show');
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Entrar'; }
+    });
+
+    document.getElementById('btn-logout')?.addEventListener('click', function () {
+        auth.signOut();
+    });
+
+    document.querySelectorAll('.admin-tabs .tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            if (tab.classList.contains('hidden')) return;
+            const t = tab.getAttribute('data-tab');
+            document.querySelectorAll('.admin-tabs .tab').forEach(function (x) { x.classList.remove('active'); });
+            tab.classList.add('active');
+            document.getElementById('main-licenses').style.display = t === 'licenses' ? 'block' : 'none';
+            document.getElementById('main-admin').style.display = t === 'admin' ? 'block' : 'none';
+            document.getElementById('main-admin').setAttribute('aria-hidden', t !== 'admin');
+        });
+    });
+});
+
+function applyMasterUI() {
+    var isMaster = typeof isMasterUser === 'function' ? isMasterUser() : false;
+    var tabAdmin = document.getElementById('tab-admin');
+    if (tabAdmin) tabAdmin.classList.toggle('hidden', !isMaster);
 }
 
 function initializePanel() {
-    saveAdminSession();
     setupEventListeners();
     loadMain();
 }
@@ -184,11 +152,79 @@ function setupEventListeners() {
             btn.setAttribute('aria-expanded', body.classList.contains('show'));
         }
     });
+
+    document.getElementById('btn-create-panel-user')?.addEventListener('click', createPanelUserSubmit);
+}
+
+async function createPanelUserSubmit() {
+    var emailEl = document.getElementById('panel-user-email');
+    var passEl = document.getElementById('panel-user-password');
+    var confirmEl = document.getElementById('panel-user-password-confirm');
+    var errEl = document.getElementById('panel-user-error');
+    var btn = document.getElementById('btn-create-panel-user');
+    var email = (emailEl && emailEl.value || '').trim().toLowerCase();
+    var password = (passEl && passEl.value) || '';
+    var passwordConfirm = (confirmEl && confirmEl.value) || '';
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (!email) {
+        if (errEl) { errEl.textContent = 'Informe o e-mail.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    if (password.length < 6) {
+        if (errEl) { errEl.textContent = 'A senha deve ter no mínimo 6 caracteres.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    if (password !== passwordConfirm) {
+        if (errEl) { errEl.textContent = 'A confirmação da senha não confere.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    var apiUrl = typeof CREATE_PANEL_USER_API_URL !== 'undefined' ? CREATE_PANEL_USER_API_URL : '';
+    if (!apiUrl) {
+        if (errEl) { errEl.textContent = 'Configure CREATE_PANEL_USER_API_URL no firebase-config.js.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    if (!currentUser) {
+        if (errEl) { errEl.textContent = 'Sessão expirada. Faça login novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
+    try {
+        var token = await currentUser.getIdToken();
+        var res = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ email: email, password: password })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.success) {
+            showAlert('Acesso criado. O usuário já pode entrar com esse e-mail e senha.', 'success');
+            if (emailEl) emailEl.value = '';
+            if (passEl) passEl.value = '';
+            if (confirmEl) confirmEl.value = '';
+        } else {
+            if (errEl) { errEl.textContent = data.error || 'Não foi possível criar o acesso. Tente novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        }
+    } catch (e) {
+        if (errEl) { errEl.textContent = 'Erro de conexão. Verifique a URL da API.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Gerar acesso'; }
 }
 
 async function loadMain() {
+    if (!currentUser || !currentUser.uid) return;
+    licenseManager.setOwnerId(currentUser.uid);
+    if (isMasterUser() && typeof migrateUnassignedLicensesToOwner === 'function') {
+        try {
+            var migrationKey = 'lovable_migration_owner_done';
+            if (!localStorage.getItem(migrationKey)) {
+                var r = await migrateUnassignedLicensesToOwner(currentUser.uid);
+                if (r.migrated > 0) localStorage.setItem(migrationKey, '1');
+            }
+        } catch (e) {}
+    }
+    await licenseManager.loadLicenses();
     const stats = await licenseManager.getStats();
-    allLicensesCache = await licenseManager.getAllLicenses();
+    allLicensesCache = licenseManager.licenses;
 
     const statsGrid = document.getElementById('stats-grid');
     if (statsGrid) {

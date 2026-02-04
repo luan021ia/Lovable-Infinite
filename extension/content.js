@@ -2,8 +2,7 @@
  * Content Script - Lovable Infinity
  * Captura token do Lovable interceptando requisições de rede
  */
-
-console.log('[Content] Content script carregado');
+(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
 
 // ============================================
 // INTERCEPTAÇÃO DE FETCH PARA CAPTURAR TOKEN

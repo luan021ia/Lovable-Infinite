@@ -11,6 +11,11 @@ class LicenseManager {
         this.ADMIN_KEY = 'master_lovable_admin_password';
         this.licenses = [];
         this.initialized = false;
+        this.ownerId = null;
+    }
+
+    setOwnerId(uid) {
+        this.ownerId = uid;
     }
 
     /**
@@ -22,13 +27,6 @@ class LicenseManager {
         if (!hasChromeStorage()) {
             this.licenses = [];
             this.initialized = true;
-            if (typeof getAllLicensesFromCloud !== 'undefined') {
-                try {
-                    this.licenses = await getAllLicensesFromCloud();
-                } catch (e) {
-                    console.warn('[LicenseManager] Web: falha ao carregar da nuvem', e);
-                }
-            }
             return;
         }
 
@@ -46,16 +44,14 @@ class LicenseManager {
     }
 
     /**
-     * Carrega licenças (local ou nuvem quando na web)
+     * Carrega licenças (local ou nuvem quando na web; na web usa ownerId se definido)
      */
     async loadLicenses() {
         if (!hasChromeStorage()) {
             if (typeof getAllLicensesFromCloud !== 'undefined') {
                 try {
-                    this.licenses = await getAllLicensesFromCloud();
-                } catch (e) {
-                    console.warn('[LicenseManager] Web: falha ao carregar da nuvem', e);
-                }
+                    this.licenses = await getAllLicensesFromCloud(this.ownerId);
+                } catch (e) {}
             }
             return this.licenses;
         }
@@ -106,21 +102,21 @@ class LicenseManager {
             created: new Date().toISOString(),
             activated: false,
             activatedDate: null,
-            activatedDevices: [], // Array de dispositivos que usaram esta licença
+            activatedDevices: [],
             expiryDate: expiryDate,
-            lifetime: lifetime, // true = vitalícia (nunca expira na UI)
+            lifetime: lifetime,
             active: true,
             uses: 0,
-            maxUses: maxUses, // null = ilimitado
+            maxUses: maxUses,
             description: '',
             userName: userName || 'Sem nome',
             userPhone: userPhone || 'Sem telefone'
         };
+        if (this.ownerId) licenseData.ownerId = this.ownerId;
 
         this.licenses.push(licenseData);
         await this.saveLicenses();
-        
-        // Sincronizar com Firebase
+
         if (typeof saveLicenseToCloud !== 'undefined') {
             await saveLicenseToCloud(licenseData);
         }
@@ -170,9 +166,7 @@ class LicenseManager {
 
                     return { valid: true, message: 'Licenca valida (nuvem)', license: cloudLicense };
                 }
-            } catch (error) {
-                console.warn('Erro ao validar na nuvem, tentando localmente:', error);
-            }
+            } catch (error) {}
         }
 
         // Fallback: validar localmente
@@ -256,11 +250,7 @@ class LicenseManager {
             if (typeof deleteLicenseFromCloud !== 'undefined') {
                 try {
                     await deleteLicenseFromCloud(key);
-                    console.log('[LicenseManager] Licença deletada do Firebase:', key);
-                } catch (error) {
-                    console.error('[LicenseManager] Erro ao deletar do Firebase:', error);
-                    // Continuar mesmo se falhar no Firebase
-                }
+                } catch (error) {}
             }
             
             return { success: true, message: 'Licença deletada com sucesso' };
@@ -286,9 +276,7 @@ class LicenseManager {
         if (!hasChromeStorage() && typeof updateLicenseInCloud !== 'undefined') {
             try {
                 await updateLicenseInCloud(key, updates);
-            } catch (e) {
-                console.warn('[LicenseManager] Erro ao sincronizar edição com Firebase:', e);
-            }
+            } catch (e) {}
         }
         return { success: true, message: 'Licença atualizada', license };
     }
@@ -319,20 +307,12 @@ class LicenseManager {
                     [this.ADMIN_KEY]: hashed
                 }, resolve);
             });
-            console.log('[Admin] Senha salva localmente');
         }
 
-        // Firebase (extensão e web)
         if (typeof saveAdminPasswordToCloud !== 'undefined') {
             try {
-                console.log('[Admin] Sincronizando senha com Firebase...');
-                const result = await saveAdminPasswordToCloud(hashed);
-                console.log('[Admin] Senha sincronizada com Firebase:', result);
-            } catch (error) {
-                console.error('[Admin] Erro ao sincronizar senha:', error);
-            }
-        } else {
-            console.warn('[Admin] saveAdminPasswordToCloud nao definida');
+                await saveAdminPasswordToCloud(hashed);
+            } catch (error) {}
         }
         
         return { success: true, message: 'Senha de admin definida e sincronizada' };
@@ -355,9 +335,7 @@ class LicenseManager {
                 if (storedHash && hasChromeStorage()) {
                     chrome.storage.local.set({ [this.ADMIN_KEY]: storedHash });
                 }
-            } catch (e) {
-                console.warn('[Admin] Erro ao carregar senha do Firebase:', e);
-            }
+            } catch (e) {}
         }
         if (!storedHash) {
             callback(true);

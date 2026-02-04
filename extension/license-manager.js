@@ -25,9 +25,7 @@ class LicenseManager {
             if (typeof getAllLicensesFromCloud !== 'undefined') {
                 try {
                     this.licenses = await getAllLicensesFromCloud();
-                } catch (e) {
-                    console.warn('[LicenseManager] Web: falha ao carregar da nuvem', e);
-                }
+                } catch (e) {}
             }
             return;
         }
@@ -53,9 +51,7 @@ class LicenseManager {
             if (typeof getAllLicensesFromCloud !== 'undefined') {
                 try {
                     this.licenses = await getAllLicensesFromCloud();
-                } catch (e) {
-                    console.warn('[LicenseManager] Web: falha ao carregar da nuvem', e);
-                }
+                } catch (e) {}
             }
             return this.licenses;
         }
@@ -164,9 +160,7 @@ class LicenseManager {
 
                     return { valid: true, message: 'Licenca valida (nuvem)', license: cloudLicense };
                 }
-            } catch (error) {
-                console.warn('Erro ao validar na nuvem, tentando localmente:', error);
-            }
+            } catch (error) {}
         }
 
         // Fallback: validar localmente
@@ -250,11 +244,7 @@ class LicenseManager {
             if (typeof deleteLicenseFromCloud !== 'undefined') {
                 try {
                     await deleteLicenseFromCloud(key);
-                    console.log('[LicenseManager] Licença deletada do Firebase:', key);
-                } catch (error) {
-                    console.error('[LicenseManager] Erro ao deletar do Firebase:', error);
-                    // Continuar mesmo se falhar no Firebase
-                }
+                } catch (error) {}
             }
             
             return { success: true, message: 'Licença deletada com sucesso' };
@@ -304,20 +294,12 @@ class LicenseManager {
                     [this.ADMIN_KEY]: hashed
                 }, resolve);
             });
-            console.log('[Admin] Senha salva localmente');
         }
 
-        // Firebase (extensão e web)
         if (typeof saveAdminPasswordToCloud !== 'undefined') {
             try {
-                console.log('[Admin] Sincronizando senha com Firebase...');
-                const result = await saveAdminPasswordToCloud(hashed);
-                console.log('[Admin] Senha sincronizada com Firebase:', result);
-            } catch (error) {
-                console.error('[Admin] Erro ao sincronizar senha:', error);
-            }
-        } else {
-            console.warn('[Admin] saveAdminPasswordToCloud nao definida');
+                await saveAdminPasswordToCloud(hashed);
+            } catch (error) {}
         }
         
         return { success: true, message: 'Senha de admin definida e sincronizada' };
@@ -340,9 +322,7 @@ class LicenseManager {
                 if (storedHash && hasChromeStorage()) {
                     chrome.storage.local.set({ [this.ADMIN_KEY]: storedHash });
                 }
-            } catch (e) {
-                console.warn('[Admin] Erro ao carregar senha do Firebase:', e);
-            }
+            } catch (e) {}
         }
         if (!storedHash) {
             callback(true);

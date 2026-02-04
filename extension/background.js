@@ -1,6 +1,5 @@
 // Background service worker
-
-console.log('[Background] Service worker iniciado');
+(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
 
 const LOVABLE_ORIGIN = 'https://lovable.dev';
 

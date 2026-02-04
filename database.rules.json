@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "licenses": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "admin": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "masters": {
+      ".read": "auth != null",
+      ".write": false
+    }
+  }
+}

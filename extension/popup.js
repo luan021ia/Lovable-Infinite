@@ -1,3 +1,4 @@
+(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
 document.addEventListener('DOMContentLoaded', async () => {
     // ============================================
     // VERIFICAÇÃO DE AUTENTICAÇÃO COM LICENÇA

@@ -2,7 +2,7 @@
  * Configurações da Extensão Lovable Infinity
  * Sistema de Licenças Vinculadas ao Dispositivo (Device Fingerprint)
  */
-
+(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
 const CONFIG = {
     REQUIRE_LICENSE: true,
     // Use a mesma databaseURL do firebase-config.js (seu novo projeto Firebase)
@@ -53,11 +53,8 @@ async function generateDeviceFingerprint() {
         
         // Gerar hash do fingerprint
         const hash = await hashString(fingerprint);
-        console.log('[Config] Fingerprint gerado:', hash);
-        
         return hash;
     } catch (error) {
-        console.error('[Config] Erro ao gerar fingerprint:', error);
         return 'UNKNOWN_DEVICE_' + Date.now();
     }
 }
@@ -72,9 +69,8 @@ async function hashString(str) {
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        return hashHex.substring(0, 32); // Pegar apenas 32 caracteres
+        return hashHex.substring(0, 32);
     } catch (error) {
-        console.error('[Config] Erro ao gerar hash:', error);
         // Fallback: hash simples
         let hash = 0;
         for (let i = 0; i < str.length; i++) {
@@ -92,18 +88,11 @@ async function hashString(str) {
 async function getDeviceFingerprint() {
     try {
         const stored = await chrome.storage.local.get('deviceFingerprint');
-        if (stored.deviceFingerprint) {
-            console.log('[Config] Fingerprint recuperado do storage');
-            return stored.deviceFingerprint;
-        }
-        
-        // Gerar novo fingerprint
+        if (stored.deviceFingerprint) return stored.deviceFingerprint;
         const fingerprint = await generateDeviceFingerprint();
         await chrome.storage.local.set({ deviceFingerprint: fingerprint });
-        console.log('[Config] Novo fingerprint gerado e armazenado');
         return fingerprint;
     } catch (error) {
-        console.error('[Config] Erro ao obter fingerprint:', error);
         return 'UNKNOWN_DEVICE';
     }
 }
@@ -142,36 +131,24 @@ async function validateKeySecure(key) {
             return { valid: false, message: 'Chave de desenvolvimento expirada (' + CONFIG.DEV_LICENSE_DAYS + ' dias). Use uma licença real ou gere outra no admin.' };
         }
         const daysLeft = Math.ceil(CONFIG.DEV_LICENSE_DAYS - daysElapsed);
-        console.log('[Auth] Modo desenvolvimento – ' + daysLeft + ' dias restantes');
         return { valid: true, message: 'Modo desenvolvimento (válido por ' + daysLeft + ' dias).', license: {} };
     }
 
     const deviceFingerprint = await getDeviceFingerprint();
 
     try {
-        console.log('[Auth] ========== INICIANDO VALIDAÇÃO ==========');
-        console.log('[Auth] Chave:', cleanKey);
-        console.log('[Auth] Device Fingerprint:', deviceFingerprint);
-        
-        // Carregar licença do Firebase
         const cloudLicense = await getLicenseFromCloud(cleanKey);
-        console.log('[Auth] Licença obtida do Firebase:', cloudLicense);
-        
+
         if (!cloudLicense) {
-            console.log('[Auth] ❌ Licença não encontrada no Firebase');
             return { valid: false, message: 'Licença não encontrada' };
         }
 
-        // Verificar se está ativa
         if (!cloudLicense.active) {
-            console.log('[Auth] ❌ Licença inativa');
             return { valid: false, message: 'Licença inativa' };
         }
 
-        // Verificar expiração
         const expiryDate = new Date(cloudLicense.expiryDate);
         if (expiryDate < new Date()) {
-            console.log('[Auth] ❌ Licença expirada');
             return { valid: false, message: 'Licença expirada' };
         }
 
@@ -183,7 +160,6 @@ async function validateKeySecure(key) {
         if (activeSession && activeSession.deviceFingerprint !== deviceFingerprint && activeSession.lastPingAt) {
             const lastPing = new Date(activeSession.lastPingAt).getTime();
             if (Date.now() - lastPing < SESSION_TIMEOUT_MS) {
-                console.log('[Auth] ❌ Licença em uso em outro dispositivo no momento');
                 return {
                     valid: false,
                     message: 'Esta licença está em uso em outro dispositivo no momento. Tente novamente mais tarde.'
@@ -197,9 +173,6 @@ async function validateKeySecure(key) {
 
         // Se a licença já foi ativada em outro dispositivo
         if (cloudLicense.activatedDeviceFingerprint && cloudLicense.activatedDeviceFingerprint !== deviceFingerprint) {
-            console.log('[Auth] ❌ Licença já foi ativada em outro dispositivo');
-            console.log('[Auth] Device anterior:', cloudLicense.activatedDeviceFingerprint);
-            console.log('[Auth] Device atual:', deviceFingerprint);
             return { 
                 valid: false, 
                 message: 'Esta licença já foi ativada em outro computador. Uma licença só pode ser usada em um dispositivo por vez.' 
@@ -210,8 +183,6 @@ async function validateKeySecure(key) {
         if (cloudLicense.activatedDeviceFingerprint === deviceFingerprint) {
             const sessionUpdate = { activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() } };
             await updateLicenseInCloud(cleanKey, sessionUpdate);
-            console.log('[Auth] ✅ Licença já foi ativada neste dispositivo. Sessão registrada.');
-            console.log('[Auth] ========== VALIDAÇÃO CONCLUÍDA COM SUCESSO ==========');
             return { 
                 valid: true, 
                 message: 'Licença ativada neste dispositivo. Acesso permanente.', 
@@ -219,14 +190,7 @@ async function validateKeySecure(key) {
             };
         }
 
-        // ============================================
-        // PRIMEIRA ATIVAÇÃO: Vincular ao dispositivo
-        // ============================================
-        console.log('[Auth] 🔄 Primeira ativação - vinculando ao dispositivo');
-        
         const newUses = (cloudLicense.uses || 0) + 1;
-        
-        // Atualizar com o fingerprint do dispositivo e registrar sessão ativa
         const updateData = {
             activatedDeviceFingerprint: deviceFingerprint,
             activatedDate: new Date().toISOString(),
@@ -235,17 +199,12 @@ async function validateKeySecure(key) {
             activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() }
         };
 
-        console.log('[Auth] Atualizando Firebase com fingerprint do dispositivo');
         const updateResult = await updateLicenseInCloud(cleanKey, updateData);
-        
+
         if (!updateResult) {
-            console.log('[Auth] ❌ Erro ao atualizar Firebase');
             return { valid: false, message: 'Erro ao ativar licença. Tente novamente.' };
         }
-        
-        console.log('[Auth] ✅ Licença vinculada permanentemente a este dispositivo');
-        console.log('[Auth] ========== VALIDAÇÃO CONCLUÍDA COM SUCESSO ==========');
-        
+
         return { 
             valid: true, 
             message: 'Licença ativada e vinculada a este dispositivo! Você poderá usar indefinidamente.', 
@@ -253,9 +212,7 @@ async function validateKeySecure(key) {
         };
 
     } catch (error) {
-        console.error('[Auth] ❌ Erro fatal:', error);
-        console.log('[Auth] ========== VALIDAÇÃO FALHOU ==========');
-        return { valid: false, message: 'Erro ao validar licença: ' + error.message };
+        return { valid: false, message: 'Erro ao validar licença.' };
     }
 }
 
@@ -284,7 +241,6 @@ async function isAuthenticated() {
         const storage = await chrome.storage.local.get(['isAuthenticated', 'licenseKey']);
         return storage.isAuthenticated === true && storage.licenseKey;
     } catch (error) {
-        console.error('[Config] Erro ao verificar autenticação:', error);
         return false;
     }
 }
@@ -302,16 +258,10 @@ async function getStoredLicenseKey() {
 async function clearAuthentication() {
     try {
         await chrome.storage.local.remove(['licenseKey', 'isAuthenticated', 'authTimestamp', 'userData', 'deviceFingerprint', 'firebaseDatabaseURL']);
-        console.log('[Config] Autenticação limpa');
-    } catch (error) {
-        console.error('[Config] Erro ao limpar autenticação:', error);
-    }
+    } catch (error) {}
 }
 
 async function initializeConfig() {
-    console.log('[Config] Inicializando');
     await verifyIntegrity();
-    const authenticated = await isAuthenticated();
-    console.log('[Config] Autenticado:', authenticated);
-    return authenticated;
+    return await isAuthenticated();
 }

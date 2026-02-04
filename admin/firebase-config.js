@@ -16,8 +16,11 @@
  * Guia completo: pasta docs/FIREBASE_SETUP.md
  */
 
+/** URL do endpoint createPanelUser no Vercel (ex: https://seu-projeto.vercel.app/api/createPanelUser) */
+var CREATE_PANEL_USER_API_URL = "";
+
 const FIREBASE_CONFIG = {
-    apiKey: "",           // Opcional para licenças; preencha se for usar Hosting/outros
+    apiKey: "",
     authDomain: "",
     databaseURL: "https://lovable2-e6f7f-default-rtdb.firebaseio.com",
     projectId: "lovable2-e6f7f",
@@ -27,40 +30,43 @@ const FIREBASE_CONFIG = {
 };
 
 let firebaseApp = null;
-let firebaseDb = null;
+let firebaseAuth = null;
 let firebaseInitialized = false;
 
 /**
- * Inicializar Firebase - Usando Realtime Database REST API
+ * Inicializar Firebase - Realtime Database REST + Auth (quando apiKey preenchido)
  */
 async function initializeFirebase() {
     return new Promise((resolve) => {
         if (firebaseInitialized) {
-            console.log('[Firebase] Já inicializado');
-            resolve(true);
+            resolve(!!firebaseApp);
             return;
         }
 
         if (!FIREBASE_CONFIG.databaseURL || FIREBASE_CONFIG.databaseURL === "") {
-            console.warn('[Firebase] databaseURL não configurado. Configure FIREBASE_CONFIG em firebase-config.js');
             resolve(false);
             return;
         }
 
         try {
+            if (typeof firebase !== 'undefined' && FIREBASE_CONFIG.apiKey) {
+                firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+                firebaseAuth = firebase.auth();
+            }
             firebaseInitialized = true;
-            console.log('[Firebase] Inicializado com sucesso!');
-            console.log('[Firebase] Database URL:', FIREBASE_CONFIG.databaseURL);
             resolve(true);
-        } catch (error) {
-            console.error('[Firebase] Erro ao inicializar:', error);
+        } catch (e) {
             resolve(false);
         }
     });
 }
 
+function getFirebaseAuth() {
+    return firebaseAuth || (typeof firebase !== 'undefined' && firebase.app && firebase.auth ? firebase.auth() : null);
+}
+
 /**
- * Fazer requisição ao Firebase Realtime Database
+ * Fazer requisição ao Firebase Realtime Database (com auth quando disponível)
  */
 async function firebaseRequest(path, method = 'GET', data = null) {
     if (!FIREBASE_CONFIG.databaseURL) {
@@ -68,7 +74,13 @@ async function firebaseRequest(path, method = 'GET', data = null) {
     }
 
     try {
-        const url = `${FIREBASE_CONFIG.databaseURL}${path}.json`;
+        let url = `${FIREBASE_CONFIG.databaseURL}${path}.json`;
+        if (typeof window !== 'undefined' && typeof window.getAdminAuthToken === 'function') {
+            try {
+                var token = await window.getAdminAuthToken();
+                if (token) url += (url.indexOf('?') !== -1 ? '&' : '?') + 'auth=' + encodeURIComponent(token);
+            } catch (e) {}
+        }
 
         const options = {
             method: method,
@@ -90,7 +102,6 @@ async function firebaseRequest(path, method = 'GET', data = null) {
         const result = await response.json();
         return result;
     } catch (error) {
-        console.error('[Firebase] Erro na requisição:', error);
         throw error;
     }
 }
@@ -100,22 +111,18 @@ async function firebaseRequest(path, method = 'GET', data = null) {
  */
 async function testFirebaseConnection() {
     try {
-        console.log('[Firebase] Testando conexão...');
-        const result = await firebaseRequest('/licenses');
-        console.log('[Firebase] Conexão OK - Dados acessíveis');
+        await firebaseRequest('/licenses');
         return { success: true, message: 'Conexão com Firebase OK' };
     } catch (error) {
-        console.error('[Firebase] Erro na conexão:', error);
-        return { success: false, message: 'Erro: ' + error.message };
+        return { success: false, message: 'Erro de conexão.' };
     }
 }
 
 /**
- * Salvar licença na nuvem
+ * Salvar licença na nuvem (ownerId opcional para multi-tenant)
  */
 async function saveLicenseToCloud(license) {
     try {
-        console.log('[Firebase] Salvando licença:', license.key);
         const path = `/licenses/${license.key}`;
         const data = {
             key: license.key,
@@ -132,50 +139,41 @@ async function saveLicenseToCloud(license) {
             activatedDevices: license.activatedDevices || [],
             timestamp: new Date().toISOString()
         };
+        if (license.ownerId) data.ownerId = license.ownerId;
         await firebaseRequest(path, 'PUT', data);
-        console.log('[Firebase] Licença salva com sucesso:', license.key);
         return true;
     } catch (error) {
-        console.error('[Firebase] Erro ao salvar licença:', error);
         return false;
     }
 }
 
 /**
- * Carregar licença da nuvem
+ * Carregar licença da nuvem (extensão usa por chave; ownerId não afeta)
  */
 async function getLicenseFromCloud(key) {
     try {
-        console.log('[Firebase] Carregando licença:', key);
         const path = `/licenses/${key}`;
         const result = await firebaseRequest(path);
-        if (result && result.key) {
-            console.log('[Firebase] Licença encontrada:', key);
-            return result;
-        }
-        console.log('[Firebase] Licença não encontrada:', key);
+        if (result && result.key) return result;
         return null;
     } catch (error) {
-        console.error('[Firebase] Erro ao carregar licença:', error);
         return null;
     }
 }
 
 /**
- * Carregar todas as licenças da nuvem
+ * Carregar licenças da nuvem. Se ownerId for passado, retorna só as do dono.
  */
-async function getAllLicensesFromCloud() {
+async function getAllLicensesFromCloud(ownerId) {
     try {
-        console.log('[Firebase] Carregando todas as licenças...');
         const result = await firebaseRequest('/licenses');
         if (result && typeof result === 'object') {
-            const licenses = Object.values(result).filter(l => l && l.key);
-            console.log('[Firebase] Carregadas ' + licenses.length + ' licenças');
+            let licenses = Object.values(result).filter(l => l && l.key);
+            if (ownerId) licenses = licenses.filter(l => l.ownerId === ownerId);
             return licenses;
         }
         return [];
     } catch (error) {
-        console.error('[Firebase] Erro ao carregar licenças:', error);
         return [];
     }
 }
@@ -185,19 +183,13 @@ async function getAllLicensesFromCloud() {
  */
 async function updateLicenseInCloud(key, updates) {
     try {
-        console.log('[Firebase] Atualizando licença:', key);
         const path = `/licenses/${key}`;
         const current = await getLicenseFromCloud(key);
-        if (!current) {
-            console.error('[Firebase] Licença não encontrada para atualizar');
-            return false;
-        }
+        if (!current) return false;
         const updated = { ...current, ...updates, timestamp: new Date().toISOString() };
         await firebaseRequest(path, 'PUT', updated);
-        console.log('[Firebase] Licença atualizada com sucesso:', key);
         return true;
     } catch (error) {
-        console.error('[Firebase] Erro ao atualizar licença:', error);
         return false;
     }
 }
@@ -207,13 +199,31 @@ async function updateLicenseInCloud(key, updates) {
  */
 async function deleteLicenseFromCloud(key) {
     try {
-        console.log('[Firebase] Deletando licença:', key);
         await firebaseRequest(`/licenses/${key}`, 'DELETE');
-        console.log('[Firebase] Licença deletada com sucesso:', key);
         return true;
     } catch (error) {
-        console.error('[Firebase] Erro ao deletar licença:', error);
         return false;
+    }
+}
+
+/**
+ * Atribui ownerId a licenças que ainda não têm (migração para master)
+ */
+async function migrateUnassignedLicensesToOwner(ownerId) {
+    try {
+        const result = await firebaseRequest('/licenses');
+        if (!result || typeof result !== 'object') return { migrated: 0 };
+        let migrated = 0;
+        for (const key of Object.keys(result)) {
+            const l = result[key];
+            if (l && l.key && !l.ownerId) {
+                await updateLicenseInCloud(key, { ownerId: ownerId });
+                migrated++;
+            }
+        }
+        return { migrated };
+    } catch (error) {
+        return { migrated: 0 };
     }
 }
 
@@ -222,24 +232,18 @@ async function deleteLicenseFromCloud(key) {
  */
 async function syncLicensesWithCloud() {
     try {
-        console.log('[Firebase] Iniciando sincronização...');
         const localLicenses = await licenseManager.getAllLicenses();
-        console.log('[Firebase] Sincronizando ' + localLicenses.length + ' licenças...');
         let saved = 0;
         for (const license of localLicenses) {
             const result = await saveLicenseToCloud(license);
             if (result) saved++;
         }
-        console.log('[Firebase] Sincronização concluída: ' + saved + '/' + localLicenses.length);
         return { success: true, message: 'Sincronizadas ' + saved + ' licenças' };
     } catch (error) {
-        console.error('[Firebase] Erro ao sincronizar:', error);
-        return { success: false, message: 'Erro: ' + error.message };
+        return { success: false, message: 'Erro ao sincronizar.' };
     }
 }
 
-// Inicializar Firebase automaticamente
-console.log('[Firebase] Carregando configuração...');
 initializeFirebase();
 
 /**
@@ -250,59 +254,42 @@ async function saveAdminPasswordToCloud(passwordHash) {
         await firebaseRequest('/admin/password', 'PUT', passwordHash);
         return true;
     } catch (error) {
-        console.error('[Firebase] Erro ao salvar senha:', error);
         return false;
     }
 }
 
-/**
- * Carregar senha de admin do Firebase
- */
 async function getAdminPasswordFromCloud() {
     try {
         const result = await firebaseRequest('/admin/password');
         return result || null;
     } catch (error) {
-        console.error('[Firebase] Erro ao carregar senha:', error);
         return null;
     }
 }
 
-/**
- * Carregar usuário de admin do Firebase
- */
 async function getAdminUsernameFromCloud() {
     try {
         const result = await firebaseRequest('/admin/username');
         return result || null;
     } catch (error) {
-        console.error('[Firebase] Erro ao carregar usuário:', error);
         return null;
     }
 }
 
-/**
- * Salvar usuário de admin no Firebase
- */
 async function saveAdminUsernameToCloud(username) {
     try {
         await firebaseRequest('/admin/username', 'PUT', username);
         return true;
     } catch (error) {
-        console.error('[Firebase] Erro ao salvar usuário:', error);
         return false;
     }
 }
 
-/**
- * Deletar senha de admin do Firebase
- */
 async function deleteAdminPasswordFromCloud() {
     try {
         await firebaseRequest('/admin/password', 'DELETE');
         return true;
     } catch (error) {
-        console.error('[Firebase] Erro ao deletar senha:', error);
         return false;
     }
 }

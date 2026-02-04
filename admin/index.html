@@ -85,19 +85,64 @@
             .modal-content { max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
             .copy-toast { bottom: max(24px, env(safe-area-inset-bottom)); }
         }
+        .login-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .login-screen.hidden { display: none; }
+        .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .login-box h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 0 0 24px 0; text-align: center; }
+        .login-box .form-group { margin-bottom: 16px; }
+        .login-box .form-group label { display: block; font-size: 12px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; }
+        .login-box input { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #f1f5f9; font-size: 14px; box-sizing: border-box; }
+        .login-box input:focus { border-color: #6366f1; outline: none; }
+        .login-box .btn-login { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; background: #6366f1; color: #fff; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
+        .login-box .btn-login:hover { background: #4f46e5; }
+        .login-box .login-error { color: #fca5a5; font-size: 13px; margin-top: 12px; display: none; }
+        .login-box .login-error.show { display: block; }
+        .admin-panel-wrap { display: none; width: 100%; flex: 1; flex-direction: column; overflow: hidden; }
+        .admin-panel-wrap.visible { display: flex; }
+        .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid #334155; padding: 0 40px; background: #1e293b; }
+        .admin-tabs .tab { padding: 12px 20px; font-size: 14px; font-weight: 500; color: #94a3b8; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .admin-tabs .tab:hover { color: #e2e8f0; }
+        .admin-tabs .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+        .admin-tabs .tab.hidden { display: none; }
     </style>
 </head>
 
 <body class="admin-page">
+    <div id="login-screen" class="login-screen">
+        <div class="login-box">
+            <h2>Entrar no painel</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="login-email">E-mail</label>
+                    <input type="email" id="login-email" required autocomplete="email" placeholder="seu@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Senha</label>
+                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••">
+                </div>
+                <p id="login-error" class="login-error" aria-live="polite"></p>
+                <button type="submit" class="btn btn-login" id="btn-login-submit">Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="admin-panel-wrap" class="admin-panel-wrap">
     <header class="admin-topbar">
         <div>
             <h1>Painel de Administração</h1>
             <p class="admin-topbar-desc">Lovable Infinity – Gerenciamento de Licenças</p>
         </div>
-        <button type="button" class="btn-cta" id="btn-open-create-modal">Criar licença</button>
+        <nav class="admin-tabs" aria-label="Abas do painel">
+            <button type="button" class="tab active" id="tab-licenses" data-tab="licenses">Licenças</button>
+            <button type="button" class="tab hidden" id="tab-admin" data-tab="admin">Administração</button>
+        </nav>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <button type="button" class="btn-cta" id="btn-open-create-modal">Criar licença</button>
+            <button type="button" class="btn btn-secondary" id="btn-logout">Sair</button>
+        </div>
     </header>
 
-    <main class="admin-main">
+    <main class="admin-main" id="main-licenses">
         <div id="alert-main" class="alert" aria-live="polite"></div>
         <div id="copy-toast" class="copy-toast" aria-live="polite">Copiado!</div>
 
@@ -141,6 +186,31 @@
             </div>
         </div>
     </main>
+
+    <main class="admin-main" id="main-admin" style="display: none;" aria-hidden="true">
+        <div class="section">
+            <h2>Criar acesso ao painel</h2>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Cadastre um usuário para acessar o painel com e-mail e senha. Cada usuário terá seu próprio ambiente de licenças.</p>
+            <div class="form-group">
+                <label for="panel-user-email">E-mail do novo usuário</label>
+                <input type="email" id="panel-user-email" placeholder="email@exemplo.com" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="panel-user-password">Senha</label>
+                <input type="password" id="panel-user-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="panel-user-password-confirm">Confirmar senha</label>
+                <input type="password" id="panel-user-password-confirm" placeholder="Repita a senha" autocomplete="new-password">
+            </div>
+            <p id="panel-user-error" class="alert alert-error" style="display: none;"></p>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="btn-create-panel-user">Gerar acesso</button>
+            </div>
+        </div>
+    </main>
+
+    </div>
 
     <!-- Modal Criar licença -->
     <div id="modal-create" class="modal" role="dialog" aria-labelledby="modal-create-title">
@@ -241,6 +311,8 @@
         </div>
     </div>
 
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="firebase-config.js"></script>
     <script src="license-manager.js"></script>
     <script src="admin.js"></script>
