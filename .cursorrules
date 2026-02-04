@@ -8,6 +8,10 @@
 - **Versionamento (obrigatório):** A versão da extensão tem uma única fonte: **package.json** (campo `version`). Nunca alterar a versão manualmente em extension/manifest.json. Ao fazer alterações que caracterizem nova versão, atualizar `version` em package.json e rodar o build; o script propaga a versão para extension/manifest.json e para o build. Documentar a regra no README e em docs quando aplicável.
 - Seguir sempre **docs/ESTRUTURA_E_REGRAS_DO_PROJETO.md** para estrutura e regras de trabalho.
 
+## Painel = produção (obrigatório)
+- **Tudo que for alterado no painel (admin/) já é em produção.** Não existe fluxo de "subir manual" ou ambiente separado. Qualquer alteração no painel deve ser feita com: build (se aplicável), deploy, commit e push. O agente (IA) deve sempre executar deploy após alterações no painel — nunca deixar para o usuário subir manual.
+- A tarja de download da extensão (nome, versão, data, botão) é exibida igual para todos os usuários; os dados vêm do build (version.json) e do deploy. Nada de publicação manual no painel.
+
 ## Deploy automático (produção)
 - O projeto está em **produção**. O **agente (IA) deve sempre executar o deploy** após alterações relevantes — nunca apenas sugerir; o deploy não pode "cair" para o usuário.
 - **API (Vercel):** Se alterou algo em `api/` ou `vercel.json`, executar: `npx vercel --prod` (na raiz do projeto).

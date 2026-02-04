@@ -184,7 +184,6 @@ function setupEventListeners() {
     });
 
     document.getElementById('btn-create-panel-user')?.addEventListener('click', createPanelUserSubmit);
-    document.getElementById('btn-publish-release')?.addEventListener('click', publishReleaseSubmit);
 
     document.getElementById('modal-extension-release-close')?.addEventListener('click', closeExtensionReleaseModal);
     document.getElementById('modal-extension-release-dismiss')?.addEventListener('click', closeExtensionReleaseModal);
@@ -314,43 +313,6 @@ async function createPanelUserSubmit() {
         if (errEl) { errEl.textContent = 'Erro de conexão. Verifique a URL da API.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
     }
     if (btn) { btn.disabled = false; btn.textContent = 'Gerar acesso'; }
-}
-
-async function publishReleaseSubmit() {
-    var versionEl = document.getElementById('release-version');
-    var messageEl = document.getElementById('release-message');
-    var errEl = document.getElementById('release-error');
-    var btn = document.getElementById('btn-publish-release');
-    var version = (versionEl && versionEl.value || '').trim();
-    var message = (messageEl && messageEl.value || '').trim();
-    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-    var apiUrl = typeof PUBLISH_EXTENSION_RELEASE_API_URL !== 'undefined' ? PUBLISH_EXTENSION_RELEASE_API_URL : '';
-    if (!apiUrl) {
-        if (errEl) { errEl.textContent = 'Configure PUBLISH_EXTENSION_RELEASE_API_URL no firebase-config.js.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
-        return;
-    }
-    if (!currentUser) {
-        if (errEl) { errEl.textContent = 'Sessão expirada. Faça login novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
-        return;
-    }
-    if (btn) { btn.disabled = true; btn.textContent = 'Publicando...'; }
-    try {
-        var token = await currentUser.getIdToken();
-        var res = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ version: version || undefined, message: message || undefined })
-        });
-        var data = await res.json().catch(function () { return {}; });
-        if (res.ok && data.success) {
-            showAlert('Versão publicada. Os usuários verão o pop-up na próxima vez que abrirem o painel.', 'success');
-        } else {
-            if (errEl) { errEl.textContent = data.error || 'Não foi possível publicar. Tente novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
-        }
-    } catch (e) {
-        if (errEl) { errEl.textContent = 'Erro de conexão. Verifique a URL da API.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
-    }
-    if (btn) { btn.disabled = false; btn.textContent = 'Publicar nova versão'; }
 }
 
 async function loadMain() {

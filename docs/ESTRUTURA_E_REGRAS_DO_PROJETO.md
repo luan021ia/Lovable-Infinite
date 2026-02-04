@@ -79,6 +79,10 @@ O deploy no Firebase publica **somente** a pasta **admin/**.
 O `firebase.json` na raiz está configurado com `"public": "admin"`.  
 Não mudar isso sem intenção de mudar a forma de publicar o admin; senão o site pode quebrar ou publicar a pasta errada.
 
+### 3.4.1. Painel = produção (obrigatório)
+
+**Tudo que for alterado no painel (admin/) já é em produção.** Não existe fluxo de "subir manual" ou ambiente separado. Qualquer alteração no painel deve ser feita com: build (se aplicável), deploy, commit e push. O agente (IA) deve sempre executar o deploy após alterações no painel — nunca deixar para o usuário subir manual. A tarja de download da extensão (nome, versão, data, botão) é exibida igual para todos os usuários; os dados vêm do build (version.json) e do deploy. Nada de publicação manual no painel.
+
 ### 3.5. Build da extensão
 
 O **único** script de build é **scripts/build.bat**. Ele sobe para a raiz do projeto, instala dependências (npm install) e executa o build (npm run build), que usa **scripts/build.js** para: (1) propagar a versão de **package.json** para **extension/manifest.json**; (2) ofuscar os JS da pasta **extension/** e gerar **extension/build/**; (3) compactar em ZIP na raiz e copiar para **admin/downloads/**; (4) executar **firebase deploy --only hosting** ao final (painel + ZIP ficam no ar).  
