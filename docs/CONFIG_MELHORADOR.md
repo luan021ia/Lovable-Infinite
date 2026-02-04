@@ -78,5 +78,5 @@ Sempre que o botão "Melhorar prompt" falhar ou não retornar texto, confira nes
 1. **Chave no Vercel:** `OPENROUTER_API_KEY` (ou `OPENROUTER_API_KEY_1`) está configurada em **Settings** → **Environment Variables** do projeto.
 2. **Redeploy:** Após alterar variáveis de ambiente ou código da API, faça **Redeploy** (Deployments → ⋮ no último deploy → Redeploy). Sem redeploy, as mudanças não entram no ar.
 3. **Logs da função:** Em caso de erro ou "resposta vazia", abra **Deployments** → último deploy → **Logs** (ou Functions → improvePrompt → Logs) e veja a mensagem exata retornada pela Open Router.
-4. **Modelo:** O código usa o modelo `tngtech/deepseek-r1t2-chimera:free`. Confira na conta [Open Router](https://openrouter.ai) se esse modelo está disponível/habilitado para sua chave.
+4. **Modelo:** O código usa o modelo `stepfun/step-3.5-flash:free`. Confira na conta [Open Router](https://openrouter.ai) se esse modelo está disponível/habilitado para sua chave.
 5. **Timeout:** A função está configurada com `maxDuration: 60` em `vercel.json`. No plano **Hobby** (grátis) do Vercel o limite é **10 segundos**; se aparecer `FUNCTION_INVOCATION_TIMEOUT`, reduza `max_tokens` no backend ou use plano Pro para poder usar os 60s.

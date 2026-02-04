@@ -9,7 +9,7 @@
  */
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const OPENROUTER_MODEL = 'tngtech/deepseek-r1t2-chimera:free';
+const OPENROUTER_MODEL = 'stepfun/step-3.5-flash:free';
 
 const SYSTEM_PROMPT = `You are an ELITE PROMPT ARCHITECT for Lovable development. Your role is to transform user requests into comprehensive, actionable prompts that generate beautiful, elegant, and highly functional applications.
 DETECTION AND ADAPTATION

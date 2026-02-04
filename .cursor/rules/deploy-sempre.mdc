@@ -1,0 +1,18 @@
+---
+description: O agente deve sempre executar o deploy após alterações que exijam atualização em produção
+alwaysApply: true
+---
+
+# Deploy obrigatório após alterações
+
+- **Regra:** Após qualquer alteração que afete produção, o agente deve **sempre executar o deploy**, nunca apenas sugerir ou avisar. Não deixar o deploy "cair" ou para o usuário fazer depois.
+
+- **Quando fazer deploy:**
+  - **API (pasta `api/`):** Alterações em `api/*`, `vercel.json` ou variáveis da API → deploy no **Vercel**. Comando: `npx vercel --prod` (na raiz do projeto). Se o projeto estiver ligado ao Git e o usuário preferir deploy por push, fazer commit e push; senão, executar `npx vercel --prod`.
+  - **Admin / extensão / Firebase:** Alterações em `admin/`, `extension/`, `firebase.json`, `.firebaserc` ou conteúdo que sobe no hosting → deploy no **Firebase**. Comando: `firebase deploy --only hosting` (na raiz do projeto).
+
+- **Ordem:** Se alterou API e admin/extension no mesmo fluxo, executar os dois deploys (Vercel e Firebase).
+
+- **Comando Firebase (PowerShell):** Na raiz do projeto: `firebase deploy --only hosting`
+
+- **Comando Vercel (PowerShell):** Na raiz do projeto: `npx vercel --prod`

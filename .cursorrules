@@ -8,6 +8,9 @@
 - Seguir sempre **docs/ESTRUTURA_E_REGRAS_DO_PROJETO.md** para estrutura e regras de trabalho.
 
 ## Deploy automático (produção)
-- O projeto está em **produção**. Toda alteração relevante (admin, extensão, firebase-config, styles, etc.) deve ser seguida de **deploy automático** no Firebase Hosting.
-- Após editar arquivos do projeto, executar: `firebase deploy --only hosting` (na pasta do projeto).
-- Comando no PowerShell: `cd "c:\Users\luan9\Downloads\Master_Lovable_Infinity"; firebase deploy --only hosting`
+- O projeto está em **produção**. O **agente (IA) deve sempre executar o deploy** após alterações relevantes — nunca apenas sugerir; o deploy não pode "cair" para o usuário.
+- **API (Vercel):** Se alterou algo em `api/` ou `vercel.json`, executar: `npx vercel --prod` (na raiz do projeto).
+- **Admin / extensão (Firebase):** Se alterou admin, extensão, firebase-config, styles, etc., executar: `firebase deploy --only hosting` (na raiz do projeto).
+- Se alterou ambos no mesmo fluxo, executar os dois deploys.
+- Comando Firebase: `firebase deploy --only hosting`
+- Comando Vercel: `npx vercel --prod`
