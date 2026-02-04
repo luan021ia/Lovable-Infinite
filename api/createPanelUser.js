@@ -1,29 +1,12 @@
 /**
  * POST /api/createPanelUser
- * Cria um usuário no Firebase Auth (e-mail/senha). Apenas master autorizado.
- * Body: { email, password [, passwordConfirm] }
- * Header: Authorization: Bearer <Firebase ID Token>
- * Env: FIREBASE_SERVICE_ACCOUNT_JSON (JSON string do service account), MASTER_EMAILS (opcional, e-mails separados por vírgula)
+ * Cria um usuário no Firebase Auth (e-mail/senha) e grava em RTDB. Apenas master autorizado.
+ * Body: { email, password [, displayName, validUntil ] }
+ * validUntil: -1 = sem expiração, ou timestamp (ms). Header: Authorization: Bearer <Firebase ID Token>
+ * Env: FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_DATABASE_URL (opcional), MASTER_EMAILS (opcional)
  */
 
-let adminApp = null;
-
-function getAdminAuth() {
-  if (adminApp) return adminApp.auth();
-  const raw = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
-  if (!raw) return null;
-  try {
-    const serviceAccount = JSON.parse(raw);
-    const admin = require('firebase-admin');
-    if (!admin.apps.length) {
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-    }
-    adminApp = admin;
-    return admin.auth();
-  } catch (e) {
-    return null;
-  }
-}
+const { getAdminAuth, verifyMasterToken, setPanelUser } = require('./lib/firebaseAdmin');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,10 +29,17 @@ module.exports = async function handler(req, res) {
 
   let email = '';
   let password = '';
+  let displayName = '';
+  let validUntil = -1;
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
     email = (body.email != null ? String(body.email) : '').trim().toLowerCase();
     password = body.password != null ? String(body.password) : '';
+    displayName = (body.displayName != null ? String(body.displayName) : '').trim();
+    if (body.validUntil !== undefined && body.validUntil !== null && body.validUntil !== '') {
+      validUntil = Number(body.validUntil);
+      if (Number.isNaN(validUntil)) validUntil = -1;
+    }
   } catch (_) {
     return res.status(400).json({ error: GENERIC_ERROR });
   }
@@ -58,10 +48,9 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: GENERIC_ERROR });
   }
 
-  const authHeader = (req.headers.authorization || req.headers.Authorization || '').trim();
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  if (!token) {
-    return res.status(401).json({ error: GENERIC_ERROR });
+  const authResult = await verifyMasterToken(req);
+  if (!authResult.ok) {
+    return res.status(authResult.status).json({ error: GENERIC_ERROR });
   }
 
   const auth = getAdminAuth();
@@ -69,24 +58,27 @@ module.exports = async function handler(req, res) {
     return res.status(503).json({ error: GENERIC_ERROR });
   }
 
-  let decoded = null;
   try {
-    decoded = await auth.verifyIdToken(token);
-  } catch (_) {
-    return res.status(401).json({ error: GENERIC_ERROR });
-  }
+    const userRecord = await auth.createUser({
+      email,
+      password,
+      emailVerified: false,
+      displayName: displayName || email,
+    });
+    const uid = userRecord.uid;
 
-  const callerEmail = (decoded.email || '').trim().toLowerCase();
-  const masterEmailsRaw = (process.env.MASTER_EMAILS || 'luan93dutra@gmail.com').trim();
-  const masterEmails = masterEmailsRaw ? masterEmailsRaw.split(',').map(function (e) { return e.trim().toLowerCase(); }).filter(Boolean) : [];
-  const isMaster = masterEmails.indexOf(callerEmail) !== -1;
-  if (!isMaster) {
-    return res.status(403).json({ error: GENERIC_ERROR });
-  }
+    await auth.setCustomUserClaims(uid, { validUntil: validUntil === -1 ? -1 : validUntil, disabled: false });
 
-  try {
-    await auth.createUser({ email: email, password: password, emailVerified: false });
-    return res.status(200).json({ success: true, message: 'Acesso criado.' });
+    await setPanelUser(uid, {
+      uid,
+      email,
+      displayName: displayName || email,
+      validUntil: validUntil === -1 ? -1 : validUntil,
+      disabled: false,
+      createdAt: Date.now(),
+    });
+
+    return res.status(200).json({ success: true, message: 'Acesso criado.', uid });
   } catch (err) {
     const code = err.code || '';
     if (code === 'auth/email-already-exists' || code === 'auth/invalid-email') {

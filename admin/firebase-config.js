@@ -18,6 +18,12 @@
 
 /** URL do endpoint createPanelUser no Vercel */
 var CREATE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/createPanelUser";
+/** URL do endpoint listPanelUsers no Vercel */
+var LIST_PANEL_USERS_API_URL = "https://lovable-infinity-api.vercel.app/api/listPanelUsers";
+/** URL do endpoint updatePanelUser no Vercel */
+var UPDATE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/updatePanelUser";
+/** URL do endpoint deletePanelUser no Vercel */
+var DELETE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/deletePanelUser";
 /** URL do endpoint publishExtensionRelease no Vercel */
 var PUBLISH_EXTENSION_RELEASE_API_URL = "https://lovable-infinity-api.vercel.app/api/publishExtensionRelease";
 

@@ -4,6 +4,7 @@
 
 let currentAction = null;
 let allLicensesCache = [];
+let panelUsersCache = [];
 let currentUser = null;
 
 const EXPIRING_DAYS = 30;
@@ -139,6 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('main-licenses').style.display = t === 'licenses' ? 'block' : 'none';
             document.getElementById('main-admin').style.display = t === 'admin' ? 'block' : 'none';
             document.getElementById('main-admin').setAttribute('aria-hidden', t !== 'admin');
+            if (t === 'admin') loadPanelUsers();
         });
     });
 });
@@ -184,6 +186,10 @@ function setupEventListeners() {
     });
 
     document.getElementById('btn-create-panel-user')?.addEventListener('click', createPanelUserSubmit);
+
+    document.getElementById('modal-edit-panel-user-close')?.addEventListener('click', closeEditPanelUserModal);
+    document.getElementById('btn-edit-panel-user-cancel')?.addEventListener('click', closeEditPanelUserModal);
+    document.getElementById('btn-edit-panel-user-submit')?.addEventListener('click', submitEditPanelUser);
 
     document.getElementById('modal-extension-release-close')?.addEventListener('click', closeExtensionReleaseModal);
     document.getElementById('modal-extension-release-dismiss')?.addEventListener('click', closeExtensionReleaseModal);
@@ -261,15 +267,27 @@ async function checkExtensionRelease() {
     loadReleaseIntoBar(null);
 }
 
+function getPanelUserValidUntilTimestamp(selectValue) {
+    var v = selectValue === undefined || selectValue === null ? '-1' : String(selectValue);
+    if (v === '-1' || v === '') return -1;
+    var days = parseInt(v, 10);
+    if (isNaN(days) || days <= 0) return -1;
+    return Date.now() + days * 24 * 60 * 60 * 1000;
+}
+
 async function createPanelUserSubmit() {
     var emailEl = document.getElementById('panel-user-email');
+    var displayNameEl = document.getElementById('panel-user-display-name');
     var passEl = document.getElementById('panel-user-password');
     var confirmEl = document.getElementById('panel-user-password-confirm');
+    var validUntilEl = document.getElementById('panel-user-valid-until');
     var errEl = document.getElementById('panel-user-error');
     var btn = document.getElementById('btn-create-panel-user');
     var email = (emailEl && emailEl.value || '').trim().toLowerCase();
+    var displayName = (displayNameEl && displayNameEl.value || '').trim();
     var password = (passEl && passEl.value) || '';
     var passwordConfirm = (confirmEl && confirmEl.value) || '';
+    var validUntil = getPanelUserValidUntilTimestamp(validUntilEl ? validUntilEl.value : '-1');
     if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
     if (!email) {
         if (errEl) { errEl.textContent = 'Informe o e-mail.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
@@ -295,17 +313,21 @@ async function createPanelUserSubmit() {
     if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
     try {
         var token = await currentUser.getIdToken();
+        var body = { email: email, password: password, validUntil: validUntil };
+        if (displayName) body.displayName = displayName;
         var res = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ email: email, password: password })
+            body: JSON.stringify(body)
         });
         var data = await res.json().catch(function () { return {}; });
         if (res.ok && data.success) {
             showAlert('Acesso criado. O usuário já pode entrar com esse e-mail e senha.', 'success');
             if (emailEl) emailEl.value = '';
+            if (displayNameEl) displayNameEl.value = '';
             if (passEl) passEl.value = '';
             if (confirmEl) confirmEl.value = '';
+            loadPanelUsers();
         } else {
             if (errEl) { errEl.textContent = data.error || 'Não foi possível criar o acesso. Tente novamente.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
         }
@@ -314,6 +336,231 @@ async function createPanelUserSubmit() {
     }
     if (btn) { btn.disabled = false; btn.textContent = 'Gerar acesso'; }
 }
+
+function formatPanelUserValidity(validUntil) {
+    if (validUntil == null || validUntil === -1 || validUntil === '') return 'Sem expiração';
+    var ts = typeof validUntil === 'number' ? validUntil : parseInt(validUntil, 10);
+    if (isNaN(ts) || ts < 0) return 'Sem expiração';
+    var d = new Date(ts);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function getPanelUserStatus(user) {
+    if (user.disabled) return { text: 'Inativo', class: 'status-inactive' };
+    var v = user.validUntil;
+    if (v == null || v === -1 || v === '') return { text: 'Ativo', class: 'status-active' };
+    var ts = typeof v === 'number' ? v : parseInt(v, 10);
+    if (ts < Date.now()) return { text: 'Expirado', class: 'status-inactive' };
+    return { text: 'Ativo', class: 'status-active' };
+}
+
+async function loadPanelUsers() {
+    var section = document.getElementById('panel-users-section');
+    var loading = document.getElementById('panel-users-loading');
+    var errorEl = document.getElementById('panel-users-error');
+    var tbody = document.getElementById('panel-users-tbody');
+    if (!section || !tbody) return;
+    var apiUrl = typeof LIST_PANEL_USERS_API_URL !== 'undefined' ? LIST_PANEL_USERS_API_URL : '';
+    if (!apiUrl) {
+        if (errorEl) { errorEl.textContent = 'Configure LIST_PANEL_USERS_API_URL no firebase-config.js.'; errorEl.style.display = 'block'; }
+        return;
+    }
+    if (!currentUser) return;
+    if (loading) { loading.style.display = 'block'; loading.textContent = 'Carregando…'; }
+    if (errorEl) errorEl.style.display = 'none';
+    try {
+        var token = await currentUser.getIdToken();
+        var res = await fetch(apiUrl, { headers: { 'Authorization': 'Bearer ' + token } });
+        var data = await res.json().catch(function () { return {}; });
+        if (loading) loading.style.display = 'none';
+        if (!res.ok) {
+            if (errorEl) { errorEl.textContent = data.error || 'Erro ao carregar usuários.'; errorEl.style.display = 'block'; }
+            tbody.innerHTML = '';
+            return;
+        }
+        var users = (data.users && Array.isArray(data.users)) ? data.users : [];
+        panelUsersCache = users;
+        renderPanelUsersTable(users);
+    } catch (e) {
+        if (loading) loading.style.display = 'none';
+        if (errorEl) { errorEl.textContent = 'Erro de conexão.'; errorEl.style.display = 'block'; }
+        tbody.innerHTML = '';
+    }
+}
+
+function renderPanelUsersTable(users) {
+    var tbody = document.getElementById('panel-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    users.forEach(function (user) {
+        var status = getPanelUserStatus(user);
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td>' + escapeHtml(user.email || '—') + '</td>' +
+            '<td>' + escapeHtml(user.displayName || '—') + '</td>' +
+            '<td>' + escapeHtml(formatPanelUserValidity(user.validUntil)) + '</td>' +
+            '<td><span class="status-badge-small ' + status.class + '">' + escapeHtml(status.text) + '</span></td>' +
+            '<td><div class="action-buttons">' +
+            '<button type="button" class="action-btn-small btn-edit-panel-user" data-uid="' + escapeAttr(user.uid) + '">Editar</button>' +
+            '<button type="button" class="action-btn-small btn-toggle-panel-user" data-uid="' + escapeAttr(user.uid) + '" data-disabled="' + (user.disabled ? 'true' : 'false') + '">' + (user.disabled ? 'Ativar' : 'Inativar') + '</button>' +
+            '<button type="button" class="action-btn-small delete btn-delete-panel-user" data-uid="' + escapeAttr(user.uid) + '">Apagar</button>' +
+            '</div></td>';
+        tbody.appendChild(tr);
+    });
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">Nenhum usuário cadastrado. Crie um acima.</td></tr>';
+    }
+    attachPanelUserButtonListeners();
+}
+
+function attachPanelUserButtonListeners() {
+    document.querySelectorAll('.btn-edit-panel-user').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var uid = btn.getAttribute('data-uid');
+            openEditPanelUserModal(uid);
+        });
+    });
+    document.querySelectorAll('.btn-toggle-panel-user').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var uid = btn.getAttribute('data-uid');
+            var disabled = btn.getAttribute('data-disabled') === 'true';
+            togglePanelUserDisabled(uid, !disabled);
+        });
+    });
+    document.querySelectorAll('.btn-delete-panel-user').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var uid = btn.getAttribute('data-uid');
+            deletePanelUserConfirm(uid);
+        });
+    });
+}
+
+function openEditPanelUserModal(uid) {
+    var user = panelUsersCache.find(function (u) { return u.uid === uid; });
+    if (!user) return;
+    var validUntil = user.validUntil == null || user.validUntil === '' ? -1 : (typeof user.validUntil === 'number' ? user.validUntil : parseInt(user.validUntil, 10));
+    if (Number.isNaN(validUntil) || validUntil < 0) validUntil = -1;
+    var disabled = !!user.disabled;
+    document.getElementById('edit-panel-user-uid').value = uid;
+    document.getElementById('edit-panel-user-email').textContent = user.email || '—';
+    document.getElementById('edit-panel-user-display-name').value = user.displayName || '';
+    document.getElementById('edit-panel-user-password').value = '';
+    var validSelect = document.getElementById('edit-panel-user-valid-until');
+    if (validSelect) {
+        if (validUntil === -1) validSelect.value = '-1';
+        else {
+            var now = Date.now();
+            var days30 = now + 30 * 24 * 60 * 60 * 1000;
+            var days90 = now + 90 * 24 * 60 * 60 * 1000;
+            var days365 = now + 365 * 24 * 60 * 60 * 1000;
+            if (validUntil <= days30) validSelect.value = '30';
+            else if (validUntil <= days90) validSelect.value = '90';
+            else if (validUntil <= days365) validSelect.value = '365';
+            else validSelect.value = '-1';
+        }
+    }
+    document.getElementById('edit-panel-user-disabled').checked = disabled;
+    var errEl = document.getElementById('edit-panel-user-error');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    document.getElementById('modal-edit-panel-user').classList.add('show');
+}
+
+function parseDateBR(str) {
+    var parts = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (!parts) return null;
+    var d = new Date(parseInt(parts[3], 10), parseInt(parts[2], 10) - 1, parseInt(parts[1], 10));
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function closeEditPanelUserModal() {
+    document.getElementById('modal-edit-panel-user').classList.remove('show');
+    window._editPanelUserData = null;
+}
+
+async function submitEditPanelUser() {
+    var uid = document.getElementById('edit-panel-user-uid').value;
+    var displayName = (document.getElementById('edit-panel-user-display-name') && document.getElementById('edit-panel-user-display-name').value || '').trim();
+    var password = (document.getElementById('edit-panel-user-password') && document.getElementById('edit-panel-user-password').value) || '';
+    var validSelect = document.getElementById('edit-panel-user-valid-until');
+    var validUntil = getPanelUserValidUntilTimestamp(validSelect ? validSelect.value : '-1');
+    var disabled = document.getElementById('edit-panel-user-disabled').checked;
+    var errEl = document.getElementById('edit-panel-user-error');
+    var apiUrl = typeof UPDATE_PANEL_USER_API_URL !== 'undefined' ? UPDATE_PANEL_USER_API_URL : '';
+    if (!apiUrl || !currentUser) return;
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (password.length > 0 && password.length < 6) {
+        if (errEl) { errEl.textContent = 'Senha deve ter no mínimo 6 caracteres.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
+    var body = { uid: uid, displayName: displayName, validUntil: validUntil, disabled: disabled };
+    if (password) body.password = password;
+    try {
+        var token = await currentUser.getIdToken();
+        var res = await fetch(apiUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(body)
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.success) {
+            showAlert('Usuário atualizado.', 'success');
+            closeEditPanelUserModal();
+            loadPanelUsers();
+        } else {
+            if (errEl) { errEl.textContent = data.error || 'Erro ao atualizar.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        }
+    } catch (e) {
+        if (errEl) { errEl.textContent = 'Erro de conexão.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+    }
+}
+
+async function togglePanelUserDisabled(uid, setDisabled) {
+    var apiUrl = typeof UPDATE_PANEL_USER_API_URL !== 'undefined' ? UPDATE_PANEL_USER_API_URL : '';
+    if (!apiUrl || !currentUser) return;
+    try {
+        var token = await currentUser.getIdToken();
+        var res = await fetch(apiUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ uid: uid, disabled: setDisabled })
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.success) {
+            showAlert(setDisabled ? 'Usuário inativado.' : 'Usuário ativado.', 'success');
+            loadPanelUsers();
+        } else {
+            showAlert(data.error || 'Erro ao atualizar.', 'error');
+        }
+    } catch (e) {
+        showAlert('Erro de conexão.', 'error');
+    }
+}
+
+function deletePanelUserConfirm(uid) {
+    currentAction = async function () {
+        var apiUrl = typeof DELETE_PANEL_USER_API_URL !== 'undefined' ? DELETE_PANEL_USER_API_URL : '';
+        if (!apiUrl || !currentUser) return;
+        try {
+            var token = await currentUser.getIdToken();
+            var res = await fetch(apiUrl, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ uid: uid })
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (res.ok && data.success) {
+                showAlert('Usuário removido.', 'success');
+                closeModal();
+                loadPanelUsers();
+            } else {
+                showAlert(data.error || 'Erro ao remover.', 'error');
+            }
+        } catch (e) {
+            showAlert('Erro de conexão.', 'error');
+        }
+    };
+    showModal('Apagar usuário', 'Tem certeza? O usuário perderá o acesso ao painel e não poderá mais entrar.');
+}
+
 
 async function loadMain() {
     if (!currentUser || !currentUser.uid) return;

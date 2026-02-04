@@ -37,6 +37,10 @@ desktop.ini
 .env.local
 .env.*.local
 
+# Firebase service account (credenciais; usar variável no Vercel)
+**/lovable*-firebase-adminsdk-*.json
+docs/*-firebase-adminsdk-*.json
+
 # Temporários
 *.tmp
 temp/

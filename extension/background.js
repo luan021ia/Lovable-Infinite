@@ -2,6 +2,7 @@
 (function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
 
 const LOVABLE_ORIGIN = 'https://lovable.dev';
+const VALIDATE_LICENSE_API_URL = 'https://lovable-infinity-api.vercel.app/api/validateLicense';
 
 function isLovableTab(url) {
     if (!url) return false;
@@ -39,8 +40,8 @@ async function syncSidePanelForAllTabs() {
 chrome.runtime.onInstalled.addListener(async () => {
     chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => console.warn('[Background] setPanelBehavior onInstalled:', err));
     await syncSidePanelForAllTabs();
-    chrome.storage.local.get(['licenseKey', 'deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
-        if (d.licenseKey && d.deviceFingerprint && d.firebaseDatabaseURL) startSessionPingAlarm();
+    chrome.storage.local.get(['licenseKey', 'deviceFingerprint'], (d) => {
+        if (d.licenseKey && d.deviceFingerprint) startSessionPingAlarm();
     });
 });
 
@@ -80,17 +81,16 @@ function stopSessionPingAlarm() {
     console.log('[Background] Alarm sessionPing removido');
 }
 
-async function pingLicenseSession(licenseKey, deviceFingerprint, firebaseDatabaseURL) {
-    if (!licenseKey || !deviceFingerprint || !firebaseDatabaseURL) return;
-    const url = firebaseDatabaseURL.replace(/\/$/, '') + '/licenses/' + encodeURIComponent(licenseKey) + '.json';
+async function pingLicenseSession(licenseKey, deviceFingerprint) {
+    if (!licenseKey || !deviceFingerprint) return;
     try {
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data || !data.key) return;
-        const updated = { ...data, activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() }, timestamp: new Date().toISOString() };
-        const putRes = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
-        if (putRes.ok) console.log('[Background] Sessão ping OK');
+        const res = await fetch(VALIDATE_LICENSE_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ licenseKey: licenseKey, deviceFingerprint: deviceFingerprint })
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.valid === true) console.log('[Background] Sessão ping OK');
     } catch (e) {
         console.warn('[Background] Ping sessão:', e);
     }
@@ -100,8 +100,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
     if (changes.licenseKey) {
         if (changes.licenseKey.newValue) {
-            chrome.storage.local.get(['deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
-                if (d.deviceFingerprint && d.firebaseDatabaseURL) startSessionPingAlarm();
+            chrome.storage.local.get(['deviceFingerprint'], (d) => {
+                if (d.deviceFingerprint) startSessionPingAlarm();
             });
         } else {
             stopSessionPingAlarm();
@@ -111,16 +111,16 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== SESSION_PING_ALARM) return;
-    chrome.storage.local.get(['licenseKey', 'deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
-        if (d.licenseKey && d.deviceFingerprint && d.firebaseDatabaseURL) {
-            pingLicenseSession(d.licenseKey, d.deviceFingerprint, d.firebaseDatabaseURL);
+    chrome.storage.local.get(['licenseKey', 'deviceFingerprint'], (d) => {
+        if (d.licenseKey && d.deviceFingerprint) {
+            pingLicenseSession(d.licenseKey, d.deviceFingerprint);
         }
     });
 });
 
 chrome.runtime.onStartup.addListener(() => {
-    chrome.storage.local.get(['licenseKey', 'deviceFingerprint', 'firebaseDatabaseURL'], (d) => {
-        if (d.licenseKey && d.deviceFingerprint && d.firebaseDatabaseURL) startSessionPingAlarm();
+    chrome.storage.local.get(['licenseKey', 'deviceFingerprint'], (d) => {
+        if (d.licenseKey && d.deviceFingerprint) startSessionPingAlarm();
     });
 });
 

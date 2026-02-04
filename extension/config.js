@@ -13,7 +13,9 @@ const CONFIG = {
     DEV_LICENSE_KEY: 'MLI-DEV-30DIAS-TESTE',
     DEV_LICENSE_DAYS: 30,
     // URL da API do melhorador de prompt (Vercel)
-    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt'
+    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt',
+    // API de validação/ativação de licença (evita PUT direto no RTDB)
+    VALIDATE_LICENSE_API_URL: 'https://lovable-infinity-api.vercel.app/api/validateLicense'
 };
 
 let licenseCache = {};
@@ -136,6 +138,24 @@ async function validateKeySecure(key) {
 
     const deviceFingerprint = await getDeviceFingerprint();
 
+    const apiUrl = (typeof CONFIG !== 'undefined' && CONFIG.VALIDATE_LICENSE_API_URL) ? CONFIG.VALIDATE_LICENSE_API_URL : '';
+    if (apiUrl) {
+        try {
+            const res = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ licenseKey: cleanKey, deviceFingerprint: deviceFingerprint })
+            });
+            const data = await res.json().catch(function () { return {}; });
+            if (data.valid === true) {
+                return { valid: true, message: data.message || 'Licença válida.', license: data.license, userData: data.userData };
+            }
+            return { valid: false, message: data.message || 'Erro ao validar licença.' };
+        } catch (e) {
+            return { valid: false, message: 'Erro ao validar licença.' };
+        }
+    }
+
     try {
         const cloudLicense = await getLicenseFromCloud(cleanKey);
 
@@ -152,10 +172,7 @@ async function validateKeySecure(key) {
             return { valid: false, message: 'Licença expirada' };
         }
 
-        // ============================================
-        // UMA SESSÃO ATIVA POR LICENÇA (evitar compartilhamento)
-        // ============================================
-        const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 min sem ping = sessão liberada
+        const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
         const activeSession = cloudLicense.activeSession;
         if (activeSession && activeSession.deviceFingerprint !== deviceFingerprint && activeSession.lastPingAt) {
             const lastPing = new Date(activeSession.lastPingAt).getTime();
@@ -167,11 +184,6 @@ async function validateKeySecure(key) {
             }
         }
 
-        // ============================================
-        // VALIDAÇÃO POR DEVICE FINGERPRINT
-        // ============================================
-
-        // Se a licença já foi ativada em outro dispositivo
         if (cloudLicense.activatedDeviceFingerprint && cloudLicense.activatedDeviceFingerprint !== deviceFingerprint) {
             return { 
                 valid: false, 
@@ -179,15 +191,10 @@ async function validateKeySecure(key) {
             };
         }
 
-        // Se a licença já foi ativada NESTE dispositivo, permitir acesso e registrar sessão ativa
         if (cloudLicense.activatedDeviceFingerprint === deviceFingerprint) {
             const sessionUpdate = { activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() } };
             await updateLicenseInCloud(cleanKey, sessionUpdate);
-            return { 
-                valid: true, 
-                message: 'Licença ativada neste dispositivo. Acesso permanente.', 
-                license: cloudLicense 
-            };
+            return { valid: true, message: 'Licença ativada neste dispositivo. Acesso permanente.', license: cloudLicense };
         }
 
         const newUses = (cloudLicense.uses || 0) + 1;
@@ -198,19 +205,9 @@ async function validateKeySecure(key) {
             lastAccessDate: new Date().toISOString(),
             activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() }
         };
-
         const updateResult = await updateLicenseInCloud(cleanKey, updateData);
-
-        if (!updateResult) {
-            return { valid: false, message: 'Erro ao ativar licença. Tente novamente.' };
-        }
-
-        return { 
-            valid: true, 
-            message: 'Licença ativada e vinculada a este dispositivo! Você poderá usar indefinidamente.', 
-            license: cloudLicense 
-        };
-
+        if (!updateResult) return { valid: false, message: 'Erro ao ativar licença. Tente novamente.' };
+        return { valid: true, message: 'Licença ativada e vinculada a este dispositivo! Você poderá usar indefinidamente.', license: cloudLicense };
     } catch (error) {
         return { valid: false, message: 'Erro ao validar licença.' };
     }

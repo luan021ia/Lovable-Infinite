@@ -11,6 +11,22 @@
       "memory": 256,
       "maxDuration": 10
     },
+    "api/listPanelUsers.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/updatePanelUser.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/deletePanelUser.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/validateLicense.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
     "api/publishExtensionRelease.js": {
       "memory": 256,
       "maxDuration": 10

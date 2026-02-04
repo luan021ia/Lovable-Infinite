@@ -218,6 +218,10 @@
                 <input type="email" id="panel-user-email" placeholder="email@exemplo.com" autocomplete="off">
             </div>
             <div class="form-group">
+                <label for="panel-user-display-name">Nome (opcional)</label>
+                <input type="text" id="panel-user-display-name" placeholder="Nome para exibição" autocomplete="off">
+            </div>
+            <div class="form-group">
                 <label for="panel-user-password">Senha</label>
                 <input type="password" id="panel-user-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
             </div>
@@ -225,9 +229,39 @@
                 <label for="panel-user-password-confirm">Confirmar senha</label>
                 <input type="password" id="panel-user-password-confirm" placeholder="Repita a senha" autocomplete="new-password">
             </div>
+            <div class="form-group">
+                <label for="panel-user-valid-until">Validade do acesso</label>
+                <select id="panel-user-valid-until">
+                    <option value="-1">Sem expiração</option>
+                    <option value="30">30 dias</option>
+                    <option value="90">90 dias</option>
+                    <option value="365">1 ano</option>
+                </select>
+            </div>
             <p id="panel-user-error" class="alert alert-error" style="display: none;"></p>
             <div class="button-group">
                 <button type="button" class="btn btn-primary" id="btn-create-panel-user">Gerar acesso</button>
+            </div>
+        </div>
+
+        <div class="section" id="panel-users-section">
+            <h2>Usuários do painel</h2>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Lista de usuários com acesso ao painel. Edite nome e senha, defina validade ou inative/remova.</p>
+            <div id="panel-users-loading" class="alert" style="display: none;">Carregando…</div>
+            <div id="panel-users-error" class="alert alert-error" style="display: none;"></div>
+            <div class="admin-table-wrap">
+                <table class="license-table" id="panel-users-table">
+                    <thead>
+                        <tr>
+                            <th>E-mail</th>
+                            <th>Nome</th>
+                            <th>Validade</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="panel-users-tbody"></tbody>
+                </table>
             </div>
         </div>
     </main>
@@ -329,6 +363,47 @@
             <div class="button-group">
                 <button type="button" class="btn btn-primary" id="btn-confirm">Confirmar</button>
                 <button type="button" class="btn btn-secondary" id="btn-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar usuário do painel -->
+    <div id="modal-edit-panel-user" class="modal" role="dialog" aria-labelledby="modal-edit-panel-user-title">
+        <div class="modal-content modal-edit">
+            <button type="button" class="modal-close" id="modal-edit-panel-user-close" aria-label="Fechar">×</button>
+            <h2 class="modal-header" id="modal-edit-panel-user-title">Editar usuário do painel</h2>
+            <input type="hidden" id="edit-panel-user-uid" value="">
+            <div class="form-group">
+                <label>E-mail (somente leitura)</label>
+                <div class="license-key" id="edit-panel-user-email"></div>
+            </div>
+            <div class="form-group">
+                <label for="edit-panel-user-display-name">Nome</label>
+                <input type="text" id="edit-panel-user-display-name" placeholder="Nome para exibição">
+            </div>
+            <div class="form-group">
+                <label for="edit-panel-user-password">Nova senha (deixe em branco para não alterar)</label>
+                <input type="password" id="edit-panel-user-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="edit-panel-user-valid-until">Validade do acesso</label>
+                <select id="edit-panel-user-valid-until">
+                    <option value="-1">Sem expiração</option>
+                    <option value="30">30 dias</option>
+                    <option value="90">90 dias</option>
+                    <option value="365">1 ano</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="edit-panel-user-disabled">
+                    <span>Inativo (bloqueia acesso ao painel)</span>
+                </label>
+            </div>
+            <p id="edit-panel-user-error" class="alert alert-error" style="display: none;"></p>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="btn-edit-panel-user-submit">Salvar</button>
+                <button type="button" class="btn btn-secondary" id="btn-edit-panel-user-cancel">Cancelar</button>
             </div>
         </div>
     </div>
