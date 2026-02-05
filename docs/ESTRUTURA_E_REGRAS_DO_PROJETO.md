@@ -11,7 +11,7 @@ Antes, tudo ficava misturado na mesma pasta: arquivos da extensão Chrome, do pa
 - **extension/** – Tudo que é a extensão Chrome (o que o usuário instala no navegador e usa no Lovable).
 - **admin/** – Tudo que é o painel administrativo (geração de licenças, lista de licenças, senha do admin). É isso que sobe para a internet quando você faz o deploy no Firebase.
 - **docs/** – Toda a documentação (este arquivo, guias de Firebase, deploy, etc.).
-- **scripts/** – Ferramentas auxiliares (por exemplo, o script que “ofusca” a extensão antes de distribuir).
+- **scripts/** – Ferramentas auxiliares (por exemplo, o script que "ofusca" a extensão antes de distribuir).
 
 Na raiz do projeto ficam **apenas** arquivos de configuração (Firebase, Git, npm, .cursorrules) e o README. Assim fica claro onde está cada coisa e mais fácil manter o código limpo.
 
@@ -24,7 +24,7 @@ Na raiz do projeto ficam **apenas** arquivos de configuração (Firebase, Git, n
 - Os arquivos da **extensão** (manifest, popup, auth, background, content, config, firebase-config, license-manager, estilos, ícones, etc.) foram movidos para a pasta **extension/**.
 - Os arquivos do **painel admin** (que antes era admin.html e admin.js na raiz) foram movidos para **admin/**. O arquivo principal do admin foi renomeado para **index.html** para ser a página inicial quando alguém acessa o site publicado.
 - Dentro de **admin/** foram colocadas **cópias** dos arquivos que o admin precisa para funcionar: firebase-config.js, license-manager.js e styles.css. Isso é necessário porque o Firebase Hosting publica só a pasta admin; ele não enxerga arquivos que estejam fora dela.
-- O **firebase.json** foi ajustado para que o “public” seja a pasta **admin**. Assim, ao rodar o comando de deploy, só o conteúdo de admin/ é enviado para a internet.
+- O **firebase.json** foi ajustado para que o "public" seja a pasta **admin**. Assim, ao rodar o comando de deploy, só o conteúdo de admin/ é enviado para a internet.
 - O script de build (**build.bat**) fica em **scripts/** e, ao ser executado, entra na pasta **extension/** e gera a versão pronta para distribuir em **extension/build/** (código ofuscado + cópias dos demais arquivos).
 - O **.gitignore** foi atualizado para ignorar a pasta de build (extension/build/) e a pasta de cache do Firebase (.firebase/).
 - Foi criado um **README.md** na raiz explicando a estrutura e como carregar a extensão, fazer deploy e ofuscar.
@@ -63,14 +63,14 @@ Os arquivos abaixo existem **tanto em extension/ quanto em admin/** porque os do
 **Regra obrigatória:**  
 Sempre que for feita **qualquer alteração** em um desses arquivos (em extension/ ou em admin/), a **mesma alteração** deve ser feita no outro.  
 Exemplo: se mudar algo em `extension/firebase-config.js`, é preciso mudar igual em `admin/firebase-config.js`.  
-Quem for fazer a alteração (hoje a assistência) deve tratar isso como um único “bloco”: alterar os dois e conferir que ficaram iguais.
+Quem for fazer a alteração (hoje a assistência) deve tratar isso como um único "bloco": alterar os dois e conferir que ficaram iguais.
 
 O **styles.css** também está nos dois lugares (extension e admin). Se no futuro for definido que o visual do admin deve divergir do da extensão, aí pode haver arquivos de estilo diferentes; até lá, manter sincronizados quando mudar algo que os dois usam.
 
 ### 3.3. Carregar a extensão no Chrome
 
 A extensão que o Chrome carrega é a pasta **extension/** (e não a raiz do projeto).  
-Em `chrome://extensions` → “Carregar sem compactação” → escolher a pasta **extension**.  
+Em `chrome://extensions` → "Carregar sem compactação" → escolher a pasta **extension**.  
 Se um dia a estrutura mudar, a documentação (por exemplo o README na raiz) deve ser atualizada para refletir qual pasta carregar.
 
 ### 3.4. Deploy do painel admin
@@ -101,12 +101,44 @@ O README na raiz e o .cursorrules descrevem essa regra; mantê-la evita esquecer
 ### 3.6. Não quebrar o que já funciona
 
 - **extension/** – Não alterar a lógica de licença, token, envio ao webhook ou fluxo de autenticação sem planejamento e sem seguir o que está documentado (por exemplo no plano de histórico por projeto).
-- **admin/** – Não alterar a forma como o admin se conecta ao Firebase nem as funções de licença sem garantir que extension e admin continuem usando a mesma “fonte da verdade” (Firebase).
+- **admin/** – Não alterar a forma como o admin se conecta ao Firebase nem as funções de licença sem garantir que extension e admin continuem usando a mesma "fonte da verdade" (Firebase).
 - **Chaves de armazenamento** – O código usa chaves específicas no storage do navegador (por exemplo para token, licença, histórico de chat). Não criar novas funcionalidades que sobrescrevam ou misturem essas chaves com as que já existem; novas funcionalidades devem usar chaves novas e isoladas (como já foi feito para o histórico de chat).
+
+### 3.6.1. Arquitetura de validação de licenças (IMPORTANTE)
+
+A **validação e ativação de licenças** na extensão **NÃO** acessa o Firebase diretamente para escrita. Ela usa a **API do Vercel** (`/api/validateLicense`).
+
+**Por quê?** As regras do Firebase (`database.rules.json`) exigem autenticação para escrita:
+```json
+"licenses": {
+  ".read": true,
+  ".write": "auth != null"
+}
+```
+
+A extensão consegue **ler** licenças diretamente do Firebase, mas para **escrever** (ativar, vincular dispositivo, atualizar sessão) precisa passar pela API Vercel que usa o **Firebase Admin SDK** com permissão total.
+
+**Fluxo atual:**
+1. Usuário digita a licença na extensão
+2. Extensão chama `POST /api/validateLicense` (Vercel) com `{ licenseKey, deviceFingerprint }`
+3. API Vercel usa Firebase Admin SDK para ler/escrever na licença
+4. API retorna `{ valid, message, license, userData }`
+5. Extensão salva os dados localmente se válida
+
+**Se precisar alterar a validação de licenças:**
+- Alterar a API em `api/validateLicense.js` (lógica de validação)
+- Alterar `extension/config.js` (como a extensão chama a API)
+- **NÃO** fazer a extensão escrever diretamente no Firebase – vai dar erro 401
+
+**Arquivos envolvidos:**
+- `api/validateLicense.js` - API Vercel (Firebase Admin SDK)
+- `api/lib/firebaseAdmin.js` - Configuração do Admin SDK
+- `extension/config.js` - Função `validateKeySecure()` que chama a API
+- `database.rules.json` - Regras de permissão do Firebase
 
 ### 3.7. Documentar mudanças importantes
 
-Quando forem feitas alterações que mudem estrutura, fluxo ou regras (por exemplo: nova pasta, nova regra de “manter dois arquivos iguais”, mudança na forma de deploy ou de carregar a extensão), isso deve ser registrado na documentação em **docs/**, incluindo atualizações neste arquivo (ESTRUTURA_E_REGRAS_DO_PROJETO.md) quando fizer sentido.
+Quando forem feitas alterações que mudem estrutura, fluxo ou regras (por exemplo: nova pasta, nova regra de "manter dois arquivos iguais", mudança na forma de deploy ou de carregar a extensão), isso deve ser registrado na documentação em **docs/**, incluindo atualizações neste arquivo (ESTRUTURA_E_REGRAS_DO_PROJETO.md) quando fizer sentido.
 
 ---
 
@@ -115,7 +147,7 @@ Quando forem feitas alterações que mudem estrutura, fluxo ou regras (por exemp
 - **Você (dono do projeto)** – Define o que quer (funcionalidades, comportamento, textos, organização). Pode pedir explicações, guias passo a passo e revisão do que foi feito. Não precisa programar.
 - **Assistência (IA)** – Faz todas as alterações de código, reorganização de pastas, criação e atualização de documentação técnica, sempre seguindo as regras deste documento e dos outros em docs/.
 
-Por isso, as “regras de projeto” acima servem tanto para você (para saber como o projeto está organizado e o que deve ser mantido) quanto para a assistência (para que cada alteração respeite a estrutura e os fluxos definidos).
+Por isso, as "regras de projeto" acima servem tanto para você (para saber como o projeto está organizado e o que deve ser mantido) quanto para a assistência (para que cada alteração respeite a estrutura e os fluxos definidos).
 
 ---
 
@@ -132,4 +164,4 @@ O **README.md** na **raiz** do projeto descreve a estrutura em árvore e como ca
 
 ---
 
-*Última atualização: fevereiro de 2025 – após reorganização da pasta do projeto (extension/, admin/, docs/, scripts/).*
+*Última atualização: fevereiro de 2025 – correção v3.2.1 (validação de licenças via API Vercel).*

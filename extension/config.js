@@ -12,7 +12,9 @@ const CONFIG = {
     DEV_LICENSE_KEY: 'MLI-DEV-30DIAS-TESTE',
     DEV_LICENSE_DAYS: 30,
     // URL da API do melhorador de prompt (Vercel)
-    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt'
+    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt',
+    // URL da API de validação de licença (Vercel) - usa Firebase Admin SDK
+    VALIDATE_LICENSE_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/validateLicense'
 };
 
 let licenseCache = {};
@@ -89,7 +91,7 @@ async function getDeviceFingerprint() {
 }
 
 /**
- * Valida a chave de licença usando Firebase
+ * Valida a chave de licença usando a API Vercel (Firebase Admin SDK)
  */
 async function validateKeySecure(key) {
     if (!CONFIG.REQUIRE_LICENSE) {
@@ -98,9 +100,8 @@ async function validateKeySecure(key) {
 
     const cleanKey = key.trim();
 
-    // Chave de desenvolvimento
-    const firebaseConfigured = typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.databaseURL.trim() !== '';
-    if (!firebaseConfigured && CONFIG.DEV_LICENSE_KEY && cleanKey === CONFIG.DEV_LICENSE_KEY) {
+    // Chave de desenvolvimento (fallback quando API não está disponível)
+    if (CONFIG.DEV_LICENSE_KEY && cleanKey === CONFIG.DEV_LICENSE_KEY) {
         const stored = await chrome.storage.local.get(['devLicenseFirstUsed']);
         const now = new Date();
         let firstUsed = stored.devLicenseFirstUsed ? new Date(stored.devLicenseFirstUsed) : null;
@@ -119,77 +120,30 @@ async function validateKeySecure(key) {
     const deviceFingerprint = await getDeviceFingerprint();
 
     try {
-        const cloudLicense = await getLicenseFromCloud(cleanKey);
+        // Usar API Vercel que tem Firebase Admin SDK (com permissão de escrita)
+        const response = await fetch(CONFIG.VALIDATE_LICENSE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                licenseKey: cleanKey,
+                deviceFingerprint: deviceFingerprint
+            })
+        });
 
-        if (!cloudLicense) {
-            return { valid: false, message: 'Licença não encontrada' };
-        }
+        const result = await response.json();
 
-        if (!cloudLicense.active) {
-            return { valid: false, message: 'Licença inativa' };
-        }
-
-        const expiryDate = new Date(cloudLicense.expiryDate);
-        if (expiryDate < new Date()) {
-            return { valid: false, message: 'Licença expirada' };
-        }
-
-        // UMA SESSÃO ATIVA POR LICENÇA
-        const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
-        const activeSession = cloudLicense.activeSession;
-        if (activeSession && activeSession.deviceFingerprint !== deviceFingerprint && activeSession.lastPingAt) {
-            const lastPing = new Date(activeSession.lastPingAt).getTime();
-            if (Date.now() - lastPing < SESSION_TIMEOUT_MS) {
-                return {
-                    valid: false,
-                    message: 'Esta licença está em uso em outro dispositivo no momento. Tente novamente mais tarde.'
-                };
-            }
-        }
-
-        // VALIDAÇÃO POR DEVICE FINGERPRINT
-        if (cloudLicense.activatedDeviceFingerprint && cloudLicense.activatedDeviceFingerprint !== deviceFingerprint) {
-            return { 
-                valid: false, 
-                message: 'Esta licença já foi ativada em outro computador.' 
-            };
-        }
-
-        // Licença já ativada neste dispositivo
-        if (cloudLicense.activatedDeviceFingerprint === deviceFingerprint) {
-            const sessionUpdate = { activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() } };
-            await updateLicenseInCloud(cleanKey, sessionUpdate);
-            return { 
-                valid: true, 
-                message: 'Licença ativada neste dispositivo. Acesso permanente.', 
-                license: cloudLicense 
-            };
-        }
-
-        // Primeira ativação
-        const newUses = (cloudLicense.uses || 0) + 1;
-        const updateData = {
-            activatedDeviceFingerprint: deviceFingerprint,
-            activatedDate: new Date().toISOString(),
-            uses: newUses,
-            lastAccessDate: new Date().toISOString(),
-            activeSession: { deviceFingerprint: deviceFingerprint, lastPingAt: new Date().toISOString() }
-        };
-
-        const updateResult = await updateLicenseInCloud(cleanKey, updateData);
-
-        if (!updateResult) {
-            return { valid: false, message: 'Erro ao ativar licença. Tente novamente.' };
-        }
-
-        return { 
-            valid: true, 
-            message: 'Licença ativada e vinculada a este dispositivo!', 
-            license: cloudLicense 
+        // A API já retorna no formato { valid, message, license?, userData? }
+        return {
+            valid: result.valid,
+            message: result.message,
+            license: result.license || null,
+            userData: result.userData || null
         };
 
     } catch (error) {
-        return { valid: false, message: 'Erro ao validar licença.' };
+        return { valid: false, message: 'Erro de conexão. Verifique sua internet e tente novamente.' };
     }
 }
 
