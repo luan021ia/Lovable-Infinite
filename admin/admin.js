@@ -5,6 +5,7 @@
 let currentAction = null;
 let allLicensesCache = [];
 let currentUser = null;
+let extensionFilename = 'LOVABLE_INFINITY.zip'; // nome padrão, atualizado via version.json
 
 const EXPIRING_DAYS = 30;
 
@@ -191,9 +192,9 @@ function setupEventListeners() {
 
     document.getElementById('modal-extension-release-close')?.addEventListener('click', closeExtensionReleaseModal);
     document.getElementById('modal-extension-release-dismiss')?.addEventListener('click', closeExtensionReleaseModal);
-    document.getElementById('modal-extension-release-download')?.addEventListener('click', function () { window.location.href = '/downloads/LOVABLE_INFINITY.zip'; });
+    document.getElementById('modal-extension-release-download')?.addEventListener('click', function () { window.location.href = '/downloads/' + extensionFilename; });
     document.getElementById('btn-download-extension')?.addEventListener('click', function () {
-        window.location.href = '/downloads/LOVABLE_INFINITY.zip';
+        window.location.href = '/downloads/' + extensionFilename;
     });
 
     // Usuários do painel
@@ -223,6 +224,10 @@ function loadReleaseIntoBar(release) {
     var dateEl = document.getElementById('extension-updated-at');
     if (versionEl) versionEl.textContent = (release && release.version != null) ? String(release.version) : '—';
     if (dateEl) dateEl.textContent = (release && release.publishedAt != null) ? formatReleaseDate(release.publishedAt) : '—';
+    // Atualiza o nome do arquivo para download
+    if (release && release.filename) {
+        extensionFilename = release.filename;
+    }
 }
 
 function getReleaseModalEl() {
@@ -268,7 +273,7 @@ async function checkExtensionRelease() {
         if (res.ok) {
             var fallback = await res.json();
             if (fallback && (fallback.version != null || fallback.publishedAt != null)) {
-                loadReleaseIntoBar({ version: fallback.version, publishedAt: fallback.publishedAt });
+                loadReleaseIntoBar({ version: fallback.version, publishedAt: fallback.publishedAt, filename: fallback.filename });
                 return;
             }
         }

@@ -20,9 +20,9 @@ const archiver = require('archiver');
 const ROOT = path.resolve(__dirname, '..');
 const EXT = path.join(ROOT, 'extension');
 const BUILD = path.join(EXT, 'build');
-const ZIP_NAME = 'LOVABLE_INFINITY.zip';
-// ZIP na raiz do projeto; o conteúdo é sempre a pasta build (produção)
-const ZIP_PATH = path.join(ROOT, ZIP_NAME);
+// ZIP_NAME será definido após determinar a versão
+let ZIP_NAME = 'LOVABLE_INFINITY.zip'; // valor inicial, será atualizado com versão
+let ZIP_PATH = path.join(ROOT, ZIP_NAME);
 // Nome da pasta dentro do ZIP: ao descompactar, o usuário terá "Lovable Infinity" com a extensão pronta
 const ZIP_FOLDER_NAME = 'Lovable Infinity';
 
@@ -185,6 +185,10 @@ async function main() {
     log('[*] Versão propagada para extension/manifest.json: ' + newVersion + '\n');
   }
 
+  // Atualizar nome do ZIP com a versão
+  ZIP_NAME = `LOVABLE_INFINITY_v${newVersion}.zip`;
+  ZIP_PATH = path.join(ROOT, ZIP_NAME);
+
   // 1) Carregar ofuscador
   let JavaScriptObfuscator;
   try {
@@ -253,11 +257,13 @@ async function main() {
   const iconsDest = path.join(BUILD, 'ICONS');
   copyDirSync(iconsSrc, iconsDest);
 
-  // 7) Compactar a pasta build em LOVABLE_INFINITY.zip (ZIP na raiz do projeto)
-  if (fs.existsSync(ZIP_PATH)) {
-    fs.unlinkSync(ZIP_PATH);
-    log('[*] ZIP anterior removido.');
-  }
+  // 7) Compactar a pasta build em LOVABLE_INFINITY_vX.X.X.zip (ZIP na raiz do projeto)
+  // Remove ZIPs anteriores (qualquer versão)
+  const oldZips = fs.readdirSync(ROOT).filter(f => f.startsWith('LOVABLE_INFINITY') && f.endsWith('.zip'));
+  oldZips.forEach(oldZip => {
+    fs.unlinkSync(path.join(ROOT, oldZip));
+    log('[*] ZIP anterior removido: ' + oldZip);
+  });
   log('\n[*] Criando ' + ZIP_NAME + ' (conteúdo: pasta build)...');
   try {
     await new Promise((resolve, reject) => {
@@ -278,15 +284,18 @@ async function main() {
   // 8) Copiar ZIP para admin/downloads (servido pelo Firebase Hosting no painel)
   const adminDownloads = path.join(ROOT, 'admin', 'downloads');
   fs.mkdirSync(adminDownloads, { recursive: true });
+  // Remove ZIPs anteriores da pasta admin/downloads
+  const oldAdminZips = fs.readdirSync(adminDownloads).filter(f => f.startsWith('LOVABLE_INFINITY') && f.endsWith('.zip'));
+  oldAdminZips.forEach(oldZip => fs.unlinkSync(path.join(adminDownloads, oldZip)));
   const zipDest = path.join(adminDownloads, ZIP_NAME);
   copyFileSync(ZIP_PATH, zipDest);
   log('[*] ZIP copiado para admin/downloads/ (para deploy no painel).');
 
-  // 8b) Gerar admin/version.json (versão + data do deploy para a barra do painel)
+  // 8b) Gerar admin/version.json (versão + data do deploy + nome do arquivo para a barra do painel)
   const versionPath = path.join(ROOT, 'admin', 'version.json');
-  const versionPayload = { version: newVersion, publishedAt: Date.now() };
+  const versionPayload = { version: newVersion, publishedAt: Date.now(), filename: ZIP_NAME };
   fs.writeFileSync(versionPath, JSON.stringify(versionPayload, null, 0), 'utf8');
-  log('[*] admin/version.json gerado (versão ' + newVersion + ', publishedAt: ' + versionPayload.publishedAt + ').');
+  log('[*] admin/version.json gerado (versão ' + newVersion + ', arquivo: ' + ZIP_NAME + ').');
 
   // 9) Deploy no Firebase Hosting (painel + ZIP disponível)
   log('\n[*] Executando deploy no Firebase (hosting)...');
