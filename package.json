@@ -1,6 +1,6 @@
 {
     "name": "license-validation-api",
-    "version": "3.2.1",
+    "version": "3.3.0",
     "description": "API para validação de chaves de licença da extensão Lovable Assistant",
     "main": "api-example.js",
     "scripts": {
