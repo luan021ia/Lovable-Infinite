@@ -1,13 +1,12 @@
+// Popup - Lovable Infinity (lógica de comunicação PROMPTXV2 + licenciamento Firebase)
 (function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
+
 document.addEventListener('DOMContentLoaded', async () => {
     // ============================================
     // VERIFICAÇÃO DE AUTENTICAÇÃO COM LICENÇA
     // ============================================
-
-    // Verificar se tem licença ativa
     const authData = await chrome.storage.local.get(['isAuthenticated', 'licenseKey']);
 
-    // Se CONFIG.REQUIRE_LICENSE for true e não tiver licença, redirecionar
     if (CONFIG.REQUIRE_LICENSE && (!authData.isAuthenticated || !authData.licenseKey)) {
         window.location.href = 'auth.html';
         return;
@@ -21,24 +20,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     const improvePromptBtn = document.getElementById('improve-prompt-btn');
     const statusBadge = document.getElementById('status-badge');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
-    const historyListBtn = document.getElementById('history-list-btn');
-    const historyDropdown = document.getElementById('history-dropdown');
-    const historyDropdownList = document.getElementById('history-dropdown-list');
-    const historyDropdownEmpty = document.getElementById('history-dropdown-empty');
     const lovableRequiredOverlay = document.getElementById('lovable-required-overlay');
     const logoutBtn = document.getElementById('logout-btn');
     const licenseDaysEl = document.getElementById('license-days');
+    const filePreviewContainer = document.getElementById('file-preview-container');
+    const screenshotBtn = document.getElementById('screenshot-btn');
 
-    // Storage key for chat per project (isolated from auth/token/license keys)
+    // Storage key for chat per project
     const CHAT_STORAGE_KEY = 'lovable_infinity_chat';
     const MAX_HISTORIES_PER_PROJECT = 20;
 
     // In-memory mirror of current chat for persistence
     let currentSessionMessages = [];
 
-    // State - Webhook ofuscado
-    const _w = ['aHR0cHM6Ly9ha3NvZnR3YXJlLW44bi5jbG91ZGZ5LmxpdmUv', 'd2ViaG9vay9wcm9tcHR4ZXhl'];
+    // State - Webhook ofuscado (lógica do PROMPTXV2 que funciona)
+    const _w = ['aHR0cHM6Ly9jbGVhbnBpZy1uOG4uY2xvdWRmeS5saXZlLw==', 'd2ViaG9vay9jY25vaGFsbGNvZGVzeGxveXU='];
     const _getW = () => atob(_w[0]) + atob(_w[1]);
+    const SECRET_SALT = atob('UFgtVjMtSEFORFNIQUtFLUAjJA==');
+    const SCRAMBLE_KEY = atob('UFJPTVBUWC1MT0NLRUQtOTk=');
 
     let config = {
         webhookUrl: _getW(),
@@ -47,22 +46,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // Load saved settings and captured token from background
-    const stored = await chrome.storage.local.get(['lovable_token', 'licenseKey']);
+    const stored = await chrome.storage.local.get(['lovable_token', 'licenseKey', 'deviceFingerprint']);
+    const HWID = stored.deviceFingerprint || 'PX-EXT-CLIENT';
 
-    // Tenta pegar o token que o background.js pode ter salvo
     if (stored.lovable_token) {
         config.token = stored.lovable_token;
         updateTokenDisplay(config.token);
     }
 
     // ============================================
-    // 🔒 VALIDAÇÃO ÚNICA DE LICENÇA NA ABERTURA
+    // VALIDAÇÃO DE LICENÇA NA ABERTURA (Firebase)
     // ============================================
-
-    /**
-     * Valida a licença UMA ÚNICA VEZ na abertura
-     * Com device fingerprint, não precisa revalidar periodicamente
-     */
     async function validateLicenseOnce() {
         const loadingOverlay = document.getElementById('loading-overlay');
 
@@ -70,24 +64,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             const authData = await chrome.storage.local.get(['licenseKey']);
 
             if (!authData.licenseKey) {
-                // Se não tem chave, joga pro login
                 window.location.href = 'auth.html';
                 return;
             }
 
-            console.log('[Popup] Validando licença na abertura...');
-            // Validação única
             const result = await validateKeySecure(authData.licenseKey);
 
             if (!result.valid) {
-                console.error('[Popup] Licença inválida:', result.message);
-                // Limpar autenticação
                 await chrome.storage.local.remove(['isAuthenticated', 'licenseKey', 'authTimestamp', 'userData', 'lovable_token', 'deviceFingerprint', 'firebaseDatabaseURL']);
                 alert('Acesso negado: ' + result.message);
                 window.location.href = 'auth.html';
             } else {
-                console.log('[Popup] Licença válida - Acesso permanente concedido');
-                // Atualizar userData com expiryDate e lifetime para exibir no header
+                // Atualizar userData com expiryDate e lifetime
                 if (result.license) {
                     const current = await chrome.storage.local.get(['userData']);
                     const userData = { ...(current.userData || {}) };
@@ -95,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (result.license.lifetime === true) userData.lifetime = true;
                     await chrome.storage.local.set({ userData });
                 }
-                // Garantir deviceFingerprint e firebaseDatabaseURL no storage (para heartbeat de sessão no background)
+                // Garantir deviceFingerprint e firebaseDatabaseURL no storage
                 const sess = await chrome.storage.local.get(['deviceFingerprint', 'firebaseDatabaseURL']);
                 if (!sess.deviceFingerprint || !sess.firebaseDatabaseURL) {
                     const fp = await getDeviceFingerprint();
@@ -106,9 +94,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await updateLicenseDaysDisplay();
             }
         } catch (error) {
-            console.error('[Popup] Erro fatal na validação:', error);
-            // Em caso de erro de rede, avisar mas não bloquear
-            console.warn('[Popup] Erro de conexão ao validar licença');
             if (loadingOverlay) {
                 loadingOverlay.style.display = 'none';
             }
@@ -147,40 +132,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             licenseDaysEl.textContent = daysLeft === 0 ? 'Último dia' : (daysLeft === 1 ? '1 dia restante' : daysLeft + ' dias restantes');
             licenseDaysEl.style.display = '';
         } else {
-            licenseDaysEl.textContent = '';
-            licenseDaysEl.style.display = 'none';
+            licenseDaysEl.textContent = 'Licença ativa';
+            licenseDaysEl.style.display = '';
         }
     }
 
     // Verificar integridade
     const integrityOk = await verifyIntegrity();
-    if (!integrityOk) {
-        console.warn('[Popup] Modificação detectada');
-    }
 
     // Executar validação UMA ÚNICA VEZ ao iniciar
-    console.log('[Popup] Iniciando validação de licença...');
     await validateLicenseOnce();
-
-
-
 
     // Helper: Update UI when token is found
     function updateTokenDisplay(token) {
         if (token) {
-            statusBadge.innerText = 'Ativo';
-            statusBadge.style.color = 'var(--success)';
+            statusBadge.innerHTML = '<span class="status-dot"></span> Ativo';
+            statusBadge.style.color = '#10b981';
             statusBadge.style.background = 'rgba(16, 185, 129, 0.1)';
-            statusBadge.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+            statusBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
         } else {
-            statusBadge.innerText = 'Desconectado';
-            statusBadge.style.color = 'var(--text-secondary)';
+            statusBadge.innerHTML = '<span class="status-dot" style="background:#a1a1aa;box-shadow:none;"></span> Desconectado';
+            statusBadge.style.color = '#a1a1aa';
             statusBadge.style.background = 'rgba(161, 161, 170, 0.1)';
             statusBadge.style.borderColor = 'rgba(161, 161, 170, 0.2)';
         }
     }
 
-    // ----- Chat storage (per project): only CHAT_STORAGE_KEY, never touch auth/token keys -----
+    // ----- Chat storage (per project) -----
     async function loadChatState(projectId) {
         if (!projectId) return;
         try {
@@ -191,9 +169,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (current.length > 0) {
                 renderMessagesToChat(current);
             }
-        } catch (e) {
-            console.warn('[Popup] loadChatState:', e);
-        }
+        } catch (e) {}
     }
 
     async function saveCurrentSession(projectId) {
@@ -204,9 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!root[projectId]) root[projectId] = { current: [], histories: [] };
             root[projectId].current = currentSessionMessages.slice();
             await chrome.storage.local.set({ [CHAT_STORAGE_KEY]: root });
-        } catch (e) {
-            console.warn('[Popup] saveCurrentSession:', e);
-        }
+        } catch (e) {}
     }
 
     function formatHistoryTitle(dateStr) {
@@ -236,9 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             root[projectId].histories = histories;
             root[projectId].current = [];
             await chrome.storage.local.set({ [CHAT_STORAGE_KEY]: root });
-        } catch (e) {
-            console.warn('[Popup] addToHistories:', e);
-        }
+        } catch (e) {}
     }
 
     function renderMessagesToChat(messages) {
@@ -251,6 +223,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             contentDiv.className = 'message-content';
             contentDiv.textContent = msg.text || '';
             messageDiv.appendChild(contentDiv);
+            
+            // Botão de copiar para mensagens do usuário
+            if (msg.type === 'user' && msg.text) {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'message-copy-btn';
+                copyBtn.title = 'Copiar prompt';
+                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                copyBtn.addEventListener('click', async () => {
+                    try {
+                        await navigator.clipboard.writeText(msg.text);
+                        copyBtn.classList.add('copied');
+                        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                        setTimeout(() => {
+                            copyBtn.classList.remove('copied');
+                            copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                        }, 1500);
+                    } catch (_) {}
+                });
+                messageDiv.appendChild(copyBtn);
+            }
+            
             chatContainer.appendChild(messageDiv);
         });
         chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -260,15 +253,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     function addMessage(text, type) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${type}`;
-
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         contentDiv.textContent = text;
-
         messageDiv.appendChild(contentDiv);
+        
+        // Botão de copiar para mensagens do usuário
+        if (type === 'user' && text) {
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'message-copy-btn';
+            copyBtn.title = 'Copiar prompt';
+            copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+            copyBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    copyBtn.classList.add('copied');
+                    copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                    setTimeout(() => {
+                        copyBtn.classList.remove('copied');
+                        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                    }, 1500);
+                } catch (_) {}
+            });
+            messageDiv.appendChild(copyBtn);
+        }
+        
         chatContainer.appendChild(messageDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight;
-
         currentSessionMessages.push({ text: text, type: type });
         if (config.projectId) saveCurrentSession(config.projectId);
     }
@@ -277,9 +288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         addMessage(text, 'system');
     }
 
-    // Elements
-    const filePreviewContainer = document.getElementById('file-preview-container');
-
     // Create hidden file input
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
@@ -287,7 +295,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     fileInput.style.display = 'none';
     document.body.appendChild(fileInput);
 
-    // Um único anexo: do input de arquivo OU colado (Ctrl+V)
     let currentAttachedFile = null;
 
     attachBtn.addEventListener('click', () => {
@@ -298,7 +305,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateSendButtonState() {
         const hasText = messageInput.value.trim().length > 0;
         const hasFile = !!currentAttachedFile;
-
         if (hasText || hasFile) {
             sendBtn.removeAttribute('disabled');
         } else {
@@ -306,57 +312,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    /**
-     * Remove formatação markdown do texto para evitar problemas com o Lovable
-     * Converte: # Título -> Título:, - item -> item, **bold** -> bold, etc.
-     */
-    function sanitizeMarkdown(text) {
-        if (!text) return '';
-
-        return text
-            // Remove headers markdown (# ## ### etc) e adiciona dois-pontos
-            .replace(/^#{1,6}\s+(.+)$/gm, '$1:')
-            // Remove asteriscos de bold/italic
-            .replace(/\*\*(.+?)\*\*/g, '$1')
-            .replace(/\*(.+?)\*/g, '$1')
-            .replace(/__(.+?)__/g, '$1')
-            .replace(/_(.+?)_/g, '$1')
-            // Remove backticks de código
-            .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
-            // Remove marcadores de lista (- ou *) - usa hífen simples para compatibilidade
-            .replace(/^[-*]\s+/gm, '- ')
-            // Remove linhas horizontais
-            .replace(/^[-*_]{3,}$/gm, '')
-            // Remove links markdown [text](url) -> text
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-            // Remove múltiplas quebras de linha
-            .replace(/\n{3,}/g, '\n\n')
-            // Trim final
-            .trim();
-    }
-
-    function showPreviewForFile(file) {
-        if (!file) return;
+    function showPreviewForFile(file, dataUrl = null) {
+        if (!file && !dataUrl) return;
         filePreviewContainer.style.display = 'flex';
         filePreviewContainer.innerHTML = '';
-
+        
+        const isImage = file ? file.type.startsWith('image/') : !!dataUrl;
         const chip = document.createElement('div');
-        chip.className = 'file-preview-chip';
-
-        chip.innerHTML = `
-            <span class="file-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-            </span>
-            <span class="file-name">${file.name}</span>
-            <button class="remove-file-btn" title="Remover">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        `;
-
-        chip.querySelector('.remove-file-btn').addEventListener('click', () => {
+        chip.className = 'file-preview-chip' + (isImage ? ' has-thumbnail' : '');
+        
+        if (isImage) {
+            // Cria miniatura da imagem
+            const thumbnail = document.createElement('div');
+            thumbnail.className = 'file-thumbnail';
+            const img = document.createElement('img');
+            
+            if (dataUrl) {
+                img.src = dataUrl;
+            } else {
+                // Lê o arquivo para criar preview
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+            
+            img.alt = file ? file.name : 'Screenshot';
+            thumbnail.appendChild(img);
+            chip.appendChild(thumbnail);
+        } else {
+            // Ícone de arquivo para não-imagens
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'file-icon';
+            iconSpan.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+            chip.appendChild(iconSpan);
+        }
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'file-name';
+        nameSpan.textContent = file ? file.name : 'Screenshot do preview';
+        chip.appendChild(nameSpan);
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-file-btn';
+        removeBtn.title = 'Remover';
+        removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+        removeBtn.addEventListener('click', () => {
             clearFile();
         });
-
+        chip.appendChild(removeBtn);
+        
         filePreviewContainer.appendChild(chip);
         attachBtn.classList.add('active');
         messageInput.focus();
@@ -370,7 +376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateSendButtonState();
     });
 
-    // Colar imagem (Ctrl+V): print ou imagem copiada
+    // Colar imagem (Ctrl+V)
     messageInput.addEventListener('paste', (e) => {
         const items = e.clipboardData?.items;
         if (!items) return;
@@ -398,178 +404,87 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateSendButtonState();
     }
 
-    // Envio: mesma lógica para (1) grampo → anexar → texto → enviar e (2) texto melhorado + imagem (Ctrl+V ou anexo).
-    // FormData no background: file primeiro, depois message, projectId, token, timestamp, chatMode (ordem fixa).
-    /** Obtém token do background (capturado via webRequest). Fonte mais confiável que o content script. */
-    function getTokenFromBackground() {
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(null), 2000);
-            chrome.runtime.sendMessage({ action: 'getToken' }, (response) => {
-                clearTimeout(timeout);
-                if (chrome.runtime.lastError) resolve(null);
-                else resolve(response && response.token ? response.token : null);
-            });
-        });
-    }
-
-    function getTokenFromActiveTab() {
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => resolve(null), 1500);
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                if (!tabs || tabs.length === 0) { clearTimeout(timeout); resolve(null); return; }
-                const tab = tabs[0];
-                if (!tab || !tab.url || !tab.url.includes('lovable.dev')) { clearTimeout(timeout); resolve(null); return; }
-                chrome.tabs.sendMessage(tab.id, { action: 'getToken' }, (response) => {
-                    clearTimeout(timeout);
-                    if (chrome.runtime.lastError) resolve(null);
-                    else resolve(response && response.token ? response.token : null);
-                });
-            });
-        });
-    }
-
+    // Envio de mensagem (lógica do PROMPTXV2 que funciona)
     async function sendMessage() {
-        // DEBUG: Log inicial
-        console.log('[DEBUG sendMessage] Iniciando envio...');
-        console.log('[DEBUG sendMessage] messageInput.value:', messageInput.value);
-        console.log('[DEBUG sendMessage] messageInput.readOnly:', messageInput.readOnly);
-
-        // O que está no input (digitado ou colocado pelo Melhorar prompt) + anexo se houver. Mesma lógica sempre.
-        const rawText = messageInput.value || '';
-        const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const text = messageInput.value.trim();
         const file = currentAttachedFile;
-
-        console.log('[DEBUG sendMessage] text após trim:', text.substring(0, 100) + '...');
-        console.log('[DEBUG sendMessage] file:', file ? file.name : 'null');
 
         if (!text && !file) return;
 
-        if (!config.webhookUrl) {
-            console.error('[Popup] Erro: Webhook URL não configurada.');
-            return;
+        if (!config.token) {
+            const freshStore = await chrome.storage.local.get(['lovable_token']);
+            if (freshStore.lovable_token) {
+                config.token = freshStore.lovable_token;
+                updateTokenDisplay(config.token);
+            }
         }
-
-        // Garantir token antes de enviar: background (webRequest) é a fonte mais confiável
-        async function ensureToken() {
-            if (config.token) return true;
-            const fromStorage = await chrome.storage.local.get(['lovable_token']);
-            if (fromStorage.lovable_token) {
-                config.token = fromStorage.lovable_token;
-                updateTokenDisplay(config.token);
-                return true;
-            }
-            const fromBg = await getTokenFromBackground();
-            if (fromBg) {
-                config.token = fromBg;
-                updateTokenDisplay(config.token);
-                return true;
-            }
-            const fromTab = await getTokenFromActiveTab();
-            if (fromTab) {
-                config.token = fromTab;
-                updateTokenDisplay(config.token);
-                return true;
-            }
-            return false;
-        }
-
-        await ensureToken();
 
         await captureData();
 
-        if (file && !config.token) {
-            const freshToken = await getTokenFromActiveTab();
-            if (freshToken) {
-                config.token = freshToken;
-                updateTokenDisplay(config.token);
-            }
-        }
-
-        console.log('[DEBUG sendMessage] config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
-        console.log('[DEBUG sendMessage] config.projectId:', config.projectId || 'VAZIO');
-
         if (!config.token || !config.projectId) {
-            console.warn('[Popup] Token ou ID do projeto ausentes. Dê um refresh na página do Lovable e tente de novo.');
+            addSystemMessage('Alerta: Token ou ID do projeto ausentes. Dê um refresh na página.');
             return;
         }
 
-        // Add user message to UI (mesmo texto que será enviado no payload)
-        const messageContent = text + (file ? ` [Imagem enviada]` : '');
-        addMessage(messageContent, 'user');
-
+        addMessage(text + (file ? ` [Imagem]` : ''), 'user');
         messageInput.value = '';
         messageInput.style.height = 'auto';
         updateSendButtonState();
 
-        // Prepare Payload and File Data
         let fileData = null;
         if (file) {
-            try {
-                fileData = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve({
-                        name: file.name,
-                        type: file.type,
-                        data: reader.result
-                    });
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            } catch (e) {
-                console.error('[Popup] Erro ao processar arquivo:', e.message);
-                return;
-            }
+            fileData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({ name: file.name, type: file.type, data: reader.result });
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
         }
 
-        // Clear file input AFTER processing
         clearFile();
 
-        const payload = {
-            message: text,
-            projectId: config.projectId,
-            token: config.token,
-            timestamp: new Date().toISOString(),
-            chatMode: false
-        };
-
-        console.log('[DEBUG sendMessage] Payload preparado:', JSON.stringify(payload).substring(0, 200) + '...');
-        console.log('[DEBUG sendMessage] fileData:', fileData ? { name: fileData.name, type: fileData.type, dataLength: fileData.data?.length } : 'null');
-
-        const doSend = () => {
-            try {
-                chrome.runtime.sendMessage({
-                    action: "sendWebhookWithFile",
-                    url: config.webhookUrl,
-                    payload,
-                    file: fileData
-                }, (response) => {
-                    console.log('[DEBUG sendMessage] Resposta do webhook:', JSON.stringify(response));
-                    if (chrome.runtime.lastError) {
-                        console.error('[Popup] Erro:', chrome.runtime.lastError.message);
-                        return;
-                    }
-                    if (response && response.success) {
-                        console.log('[Popup] Mensagem enviada com sucesso.');
-                        const json = response.data || {};
-                        if (json.reply) console.log('[Popup] Resposta:', json.reply);
-                    } else {
-                        console.error('[Popup] Erro ao enviar:', response?.error || 'Desconhecido');
-                    }
-                });
-            } catch (error) {
-                console.error('[Popup] Erro interno:', error.message);
-            }
-        };
-
         try {
-            // Envio único: o que está no input (digitado ou colocado pelo Melhorar prompt) + anexo se houver. Sem lógica especial.
-            doSend();
+            const timeRef = Math.floor(Date.now() / 60000);
+            const signature = btoa(timeRef + SECRET_SALT + stored.licenseKey + HWID).slice(0, 20);
+
+            const basicPayload = {
+                message: text,
+                projectId: config.projectId,
+                token: config.token,
+                source: 'PX-EXT',
+                license: stored.licenseKey,
+                hwid: HWID,
+                signature: signature
+            };
+
+            const scramble = (s, k) => s.split('').map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ k.charCodeAt(i % k.length))).join('');
+            const jsonStr = unescape(encodeURIComponent(JSON.stringify(basicPayload)));
+            const packed = btoa(scramble(jsonStr, SCRAMBLE_KEY));
+
+            chrome.runtime.sendMessage({
+                action: "sendWebhookWithFile",
+                url: config.webhookUrl,
+                payload: { p: packed },
+                file: fileData
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    addSystemMessage("Erro: " + chrome.runtime.lastError.message);
+                    return;
+                }
+                if (response && response.success) {
+                    const json = response.data || {};
+                    if (json.reply) addSystemMessage(json.reply);
+                    else addSystemMessage('Enviado com sucesso!');
+                } else {
+                    addSystemMessage(`Falha: ${response.error || 'Erro interno'}`);
+                }
+            });
         } catch (error) {
-            console.error('[Popup] Erro interno:', error.message);
+            addSystemMessage(`Erro: ${error.message}`);
         }
     }
 
-    // Limpar histórico da conversa (salva em Histórico antes se houver projeto e mensagens)
+    // Limpar histórico da conversa
     async function clearChatHistory() {
         if (config.projectId && currentSessionMessages.length > 0) {
             await addToHistories(config.projectId, formatHistoryTitle(new Date().toISOString()));
@@ -581,9 +496,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     clearHistoryBtn.addEventListener('click', async () => {
         if (chatContainer.children.length === 0) return;
-        if (confirm('Limpar todo o histórico da conversa?')) {
-            await clearChatHistory();
-        }
+        // Arquiva a conversa atual e limpa o chat (sem confirmação para fluidez)
+        await clearChatHistory();
     });
 
     // Sair: limpar licença/sessão e voltar para a tela de ativação
@@ -596,182 +510,152 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = 'auth.html';
     });
 
-    // Histórico: abrir lista de conversas salvas do projeto atual
-    historyListBtn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!config.projectId) {
-            if (historyDropdown.style.display === 'none') return;
-            historyDropdown.style.display = 'none';
-            return;
-        }
-        const isOpen = historyDropdown.style.display !== 'none';
-        if (isOpen) {
-            historyDropdown.style.display = 'none';
-            return;
-        }
-        try {
-            const result = await chrome.storage.local.get([CHAT_STORAGE_KEY]);
-            const data = result[CHAT_STORAGE_KEY] && result[CHAT_STORAGE_KEY][config.projectId];
-            const histories = (data && data.histories && Array.isArray(data.histories)) ? data.histories : [];
-            historyDropdownList.innerHTML = '';
-            historyDropdownEmpty.style.display = histories.length === 0 ? 'block' : 'none';
-            histories.forEach(function (entry) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'history-dropdown-item';
-                btn.textContent = entry.title || formatHistoryTitle(entry.createdAt);
-                btn.addEventListener('click', function () {
-                    if (entry.messages && entry.messages.length > 0) {
-                        currentSessionMessages = entry.messages.slice();
-                        renderMessagesToChat(entry.messages);
-                        if (config.projectId) saveCurrentSession(config.projectId);
-                    }
-                    historyDropdown.style.display = 'none';
-                });
-                historyDropdownList.appendChild(btn);
-            });
-            historyDropdown.style.display = 'flex';
-        } catch (err) {
-            console.warn('[Popup] Histórico:', err);
-            historyDropdown.style.display = 'none';
-        }
-    });
-
-    document.addEventListener('click', function () {
-        if (historyDropdown.style.display !== 'none') historyDropdown.style.display = 'none';
-    });
-    historyDropdown.addEventListener('click', function (e) {
-        e.stopPropagation();
-    });
-
-    // Melhorar prompt: apenas troca o texto no input. O envio continua igual (como se o usuário tivesse digitado).
-    improvePromptBtn.addEventListener('click', async () => {
-        console.log('[DEBUG Enhanced] INÍCIO - config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
-        console.log('[DEBUG Enhanced] INÍCIO - config.projectId:', config.projectId || 'VAZIO');
-
-        const text = messageInput.value.trim();
-        if (!text) {
-            console.warn('[Popup] Digite algo para melhorar.');
-            messageInput.focus();
-            return;
-        }
-        const endpoint = (typeof CONFIG !== 'undefined' && CONFIG.IMPROVE_PROMPT_ENDPOINT) ? CONFIG.IMPROVE_PROMPT_ENDPOINT : '';
-        if (!endpoint) {
-            console.warn('[Popup] Melhorador de prompt não configurado (IMPROVE_PROMPT_ENDPOINT).');
-            return;
-        }
-        improvePromptBtn.disabled = true;
-        improvePromptBtn.classList.add('loading');
-        improvePromptBtn.setAttribute('aria-busy', 'true');
-        improvePromptBtn.title = 'Melhorando...';
-        messageInput.readOnly = true;
-        messageInput.classList.add('improving');
-        messageInput.placeholder = 'Melhorando prompt...';
-        attachBtn.disabled = true;
-        sendBtn.disabled = true;
-        // Não limpar o input aqui: só substituir quando o primeiro chunk da IA chegar. Se a API falhar, o texto original fica na caixa.
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: text, stream: false })
-            });
-            const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
-            const isJson = contentType.includes('application/json');
-            let fullText = '';
-
-            if (!response.ok) {
-                const errText = await response.text();
-                let errMsg = 'Erro ao melhorar prompt.';
-                try {
-                    const errData = JSON.parse(errText);
-                    errMsg = errData.error || errData.message || errMsg;
-                } catch (_) {
-                    if (errText) errMsg = errText.slice(0, 200);
-                    else errMsg = response.status + ' ' + (response.statusText || errMsg);
-                }
-                if (errMsg && (errMsg.includes('resposta vazia') || errMsg.includes('Open Router retornou resposta vazia'))) {
-                    errMsg = 'A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).';
-                }
-                console.error('[Popup] Erro ao melhorar prompt:', errMsg);
+    // Screenshot do preview do Lovable
+    if (screenshotBtn) {
+        screenshotBtn.addEventListener('click', async () => {
+            // Verifica se está no Lovable com projeto aberto
+            if (!config.projectId) {
+                addSystemMessage('Abra um projeto no Lovable para capturar o preview.');
                 return;
             }
 
-            if (isJson) {
-                const json = await response.json();
-                if (json.error) {
-                    console.error('[Popup] Erro da API:', json.error);
+            screenshotBtn.disabled = true;
+            screenshotBtn.classList.add('loading');
+            
+            try {
+                const devicePixelRatio = window.devicePixelRatio || 1;
+                
+                const response = await new Promise((resolve) => {
+                    chrome.runtime.sendMessage({
+                        action: "capturePreviewScreenshot",
+                        devicePixelRatio: devicePixelRatio
+                    }, resolve);
+                });
+
+                if (response && response.success && response.dataUrl) {
+                    // Converte dataUrl para File
+                    const res = await fetch(response.dataUrl);
+                    const blob = await res.blob();
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                    currentAttachedFile = new File([blob], `preview-${timestamp}.png`, { type: 'image/png' });
+                    
+                    showPreviewForFile(currentAttachedFile, response.dataUrl);
+                    updateSendButtonState();
+                    addSystemMessage('Screenshot capturado! Envie com sua mensagem.');
+                } else {
+                    addSystemMessage(response?.error || 'Não foi possível capturar o preview.');
+                }
+            } catch (error) {
+                addSystemMessage('Erro ao capturar: ' + (error.message || 'desconhecido'));
+            } finally {
+                screenshotBtn.disabled = false;
+                screenshotBtn.classList.remove('loading');
+            }
+        });
+    }
+
+    // Melhorar prompt: stream da API, texto aparece no input em tempo real
+    if (improvePromptBtn) {
+        improvePromptBtn.addEventListener('click', async () => {
+            const text = messageInput.value.trim();
+            if (!text) {
+                messageInput.focus();
+                return;
+            }
+            const endpoint = (typeof CONFIG !== 'undefined' && CONFIG.IMPROVE_PROMPT_ENDPOINT) ? CONFIG.IMPROVE_PROMPT_ENDPOINT : '';
+            if (!endpoint) {
+                addSystemMessage('Melhorador de prompt não configurado.');
+                return;
+            }
+            improvePromptBtn.disabled = true;
+            improvePromptBtn.classList.add('loading');
+            improvePromptBtn.setAttribute('aria-busy', 'true');
+            improvePromptBtn.title = 'Melhorando...';
+            messageInput.readOnly = true;
+            messageInput.classList.add('improving');
+            messageInput.placeholder = 'Melhorando prompt...';
+            attachBtn.disabled = true;
+            sendBtn.disabled = true;
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text, stream: false })
+                });
+                
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    addSystemMessage(errData.error || response.statusText || 'Erro ao melhorar prompt.');
                     return;
                 }
-                const msg = json.text ?? json.choices?.[0]?.message?.content ?? json.choices?.[0]?.delta?.content ?? json.message ?? '';
-                if (typeof msg === 'string') fullText = msg.trim();
-                else if (Array.isArray(msg)) fullText = msg.map(p => (p && typeof p.text === 'string') ? p.text : (typeof p === 'string' ? p : '')).join('').trim();
-                else fullText = '';
-            } else {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                const parseDataLine = (payload) => {
-                    if (!payload || payload === '[DONE]') return null;
-                    try {
-                        const data = JSON.parse(payload);
-                        const content = data.choices?.[0]?.delta?.content ?? data.choices?.[0]?.message?.content ?? null;
-                        return typeof content === 'string' ? content : null;
-                    } catch (_) { return null; }
-                };
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const content = parseDataLine(line.slice(6).trim());
-                            if (content) {
-                                fullText += content;
-                                messageInput.value = fullText;
-                                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                const contentType = (response.headers.get('Content-Type') || '').toLowerCase();
+                const isJson = contentType.includes('application/json');
+                let fullText = '';
+                
+                if (isJson) {
+                    const json = await response.json();
+                    if (json.error) {
+                        addSystemMessage(json.error);
+                        return;
+                    }
+                    const msg = json.text ?? json.choices?.[0]?.message?.content ?? json.message ?? '';
+                    fullText = typeof msg === 'string' ? msg.trim() : '';
+                } else {
+                    // Stream SSE
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    messageInput.value = '';
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+                        const parts = buffer.split('\n\n');
+                        buffer = parts.pop() || '';
+                        for (const part of parts) {
+                            if (part.startsWith('data: ')) {
+                                const payload = part.slice(6).trim();
+                                if (payload === '[DONE]') continue;
+                                try {
+                                    const data = JSON.parse(payload);
+                                    const content = data.choices?.[0]?.delta?.content ?? data.choices?.[0]?.message?.content;
+                                    if (content) {
+                                        messageInput.value += content;
+                                        messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                    }
+                                } catch (_) {}
                             }
                         }
                     }
+                    fullText = messageInput.value;
                 }
-                if (buffer.startsWith('data: ')) {
-                    const content = parseDataLine(buffer.slice(6).trim());
-                    if (content) fullText += content;
+                
+                if (fullText) {
+                    messageInput.value = fullText;
+                    messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    messageInput.scrollTop = messageInput.scrollHeight;
+                    updateSendButtonState();
                 }
-            }
-
-            if (fullText) {
-                // Sanitiza o markdown para evitar problemas com o Lovable
-                const cleanText = sanitizeMarkdown(fullText);
-                console.log('[DEBUG Enhanced] Texto sanitizado:', cleanText.substring(0, 100) + '...');
-                messageInput.value = cleanText;
-                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-                messageInput.scrollTop = messageInput.scrollHeight;
+                messageInput.focus();
+            } catch (e) {
+                addSystemMessage('Erro: ' + (e.message || 'desconhecido'));
+            } finally {
+                improvePromptBtn.disabled = false;
+                improvePromptBtn.classList.remove('loading');
+                improvePromptBtn.removeAttribute('aria-busy');
+                improvePromptBtn.title = 'Melhorar prompt com IA';
+                messageInput.readOnly = false;
+                messageInput.classList.remove('improving');
+                messageInput.placeholder = 'Enviar mensagem...';
+                attachBtn.disabled = false;
+                sendBtn.disabled = false;
                 updateSendButtonState();
-            } else {
-                console.error('[Popup] A IA não retornou texto. Verifique OPENROUTER_API_KEY e o modelo no Vercel (Deployments → Logs).');
             }
-            messageInput.focus();
-        } catch (e) {
-            console.error('[Popup] Erro:', e.message || 'desconhecido');
-        } finally {
-            console.log('[DEBUG Enhanced] FINALLY - config.token:', config.token ? config.token.substring(0, 20) + '...' : 'VAZIO');
-            console.log('[DEBUG Enhanced] FINALLY - config.projectId:', config.projectId || 'VAZIO');
-
-            improvePromptBtn.disabled = false;
-            improvePromptBtn.classList.remove('loading');
-            improvePromptBtn.removeAttribute('aria-busy');
-            improvePromptBtn.title = 'Melhorar prompt com IA';
-            messageInput.readOnly = false;
-            messageInput.classList.remove('improving');
-            messageInput.placeholder = 'Enviar mensagem...';
-            attachBtn.disabled = false;
-            sendBtn.disabled = false;
-            updateSendButtonState();
-        }
-    });
+        });
+    }
 
     // Event Listeners
     sendBtn.addEventListener('click', sendMessage);
@@ -801,27 +685,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function captureData() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
         if (!tab || !tab.url) {
             config.projectId = '';
             return;
         }
-
         if (!isOnLovableTab(tab.url)) {
             config.projectId = '';
             return;
         }
-
-        // 1. Get Project ID from URL
         const projectMatch = tab.url.match(/projects\/([a-zA-Z0-9-]+)/);
         if (projectMatch && projectMatch[1]) {
             config.projectId = projectMatch[1];
         } else {
             config.projectId = '';
-            console.log("No project ID found in URL");
         }
-
-        // Se a gente ainda não tem o token, tenta o background
         if (!config.token) {
             const freshStore = await chrome.storage.local.get(['lovable_token']);
             if (freshStore.lovable_token) {
@@ -831,108 +708,78 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function updateLovableRequiredOverlay() {
+    // Atualiza overlay baseado no estado atual
+    function updateOverlayState() {
+        if (!lovableRequiredOverlay) return;
+        
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             const tab = tabs && tabs[0];
-            const onLovable = tab && tab.url && isOnLovableTab(tab.url);
-            if (lovableRequiredOverlay) {
-                lovableRequiredOverlay.style.display = onLovable ? 'none' : 'flex';
-            }
-        });
-    }
-
-    // Initial capture on open, then load chat state for this project
-    await captureData();
-    updateLovableRequiredOverlay();
-    if (config.projectId) loadChatState(config.projectId);
-
-    // Verificar periodicamente se a aba ativa é Lovable (painel pode ficar aberto ao trocar de aba)
-    setInterval(function () {
-        updateLovableRequiredOverlay();
-        chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
-            const tab = tabs && tabs[0];
-            if (tab && tab.url && isOnLovableTab(tab.url)) {
-                await captureData();
-            }
-        });
-    }, 1500);
-
-    // Tentar capturar token: content script + background (background é a fonte mais confiável)
-    function applyTokenIfFound(token, source) {
-        if (token) {
-            config.token = token;
-            updateTokenDisplay(config.token);
-            console.log('[Popup] Token obtido do', source + ':', config.token.substring(0, 20) + '...');
-        }
-    }
-
-    async function requestTokenFromContent() {
-        try {
-            const tabs = await new Promise((r) => chrome.tabs.query({ active: true, currentWindow: true }, r));
-            if (!tabs || tabs.length === 0) {
-                console.log('[Popup] Nenhuma aba ativa encontrada');
-                return;
-            }
-            const tab = tabs[0];
-            if (tab && tab.url && tab.url.includes('lovable.dev')) {
-                console.log('[Popup] Solicitando token do content script e do background...');
-                const fromBg = await getTokenFromBackground();
-                if (fromBg) {
-                    applyTokenIfFound(fromBg, 'background');
-                    return;
-                }
-                chrome.tabs.sendMessage(tab.id, { action: 'getToken' }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        console.log('[Popup] Content script:', chrome.runtime.lastError.message);
-                        return;
-                    }
-                    if (response && response.token) applyTokenIfFound(response.token, 'content script');
-                    else console.log('[Popup] Nenhum token retornado do content script');
-                });
+            const url = tab?.url || '';
+            const onLovable = isOnLovableTab(url);
+            const hasProject = !!config.projectId;
+            
+            if (!onLovable) {
+                // Fora do Lovable completamente
+                lovableRequiredOverlay.innerHTML = `
+                    <p class="lovable-required-text">Abra o Lovable.dev para usar a extensão.</p>
+                    <p class="lovable-required-hint">A extensão só funciona em abas de projeto do Lovable.</p>
+                `;
+                lovableRequiredOverlay.style.display = 'flex';
+            } else if (!hasProject) {
+                // No Lovable, mas sem projeto aberto
+                lovableRequiredOverlay.innerHTML = `
+                    <p class="lovable-required-text">Acesse um projeto para começar</p>
+                    <p class="lovable-required-hint">Selecione ou crie um projeto no Lovable para editar.</p>
+                `;
+                lovableRequiredOverlay.style.display = 'flex';
             } else {
-                const fromBg = await getTokenFromBackground();
-                if (fromBg) applyTokenIfFound(fromBg, 'background');
+                // No Lovable com projeto aberto
+                lovableRequiredOverlay.style.display = 'none';
             }
-        } catch (error) {
-            console.error('[Popup] Erro ao solicitar token:', error);
+        });
+    }
+
+    // Captura dados e carrega histórico no carregamento inicial
+    let currentProjectId = '';
+    
+    async function initializeForCurrentTab() {
+        await captureData();
+        
+        // Se mudou de projeto, recarrega o histórico
+        if (config.projectId !== currentProjectId) {
+            currentProjectId = config.projectId;
+            currentSessionMessages = [];
+            chatContainer.replaceChildren();
+            
+            if (config.projectId) {
+                await loadChatState(config.projectId);
+            }
         }
+        
+        updateOverlayState();
     }
-
-    // Polling: token pode ser capturado pelo background quando a página Lovable fizer a primeira requisição
-    function startTokenPolling() {
-        let attempts = 0;
-        const maxAttempts = 6;
-        const intervalMs = 1000;
-        const poll = async () => {
-            if (config.token) return;
-            attempts++;
-            const fromBg = await getTokenFromBackground();
-            if (fromBg) {
-                applyTokenIfFound(fromBg, 'background (polling)');
-                return;
-            }
-            const fromStorage = await chrome.storage.local.get(['lovable_token']);
-            if (fromStorage.lovable_token) {
-                applyTokenIfFound(fromStorage.lovable_token, 'storage (polling)');
-                return;
-            }
-            if (attempts < maxAttempts) setTimeout(poll, intervalMs);
-        };
-        setTimeout(poll, intervalMs);
-    }
-
-    // Solicitar token com delay para content script estar injetado; depois polling para pegar quando background capturar
-    setTimeout(() => {
-        requestTokenFromContent();
-        startTokenPolling();
-    }, 500);
+    
+    // Inicialização
+    await initializeForCurrentTab();
+    
+    // Detecta quando a aba atualiza (navegação, refresh)
+    chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+        // Só processa se a URL mudou e o carregamento completou
+        if (changeInfo.status === 'complete' && tab.active) {
+            await initializeForCurrentTab();
+        }
+    });
+    
+    // Detecta quando o usuário troca de aba
+    chrome.tabs.onActivated.addListener(async () => {
+        await initializeForCurrentTab();
+    });
 
     // Listen for storage changes in real-time
     chrome.storage.onChanged.addListener((changes, namespace) => {
         if (namespace === 'local' && changes.lovable_token) {
             config.token = changes.lovable_token.newValue;
             updateTokenDisplay(config.token);
-            console.log('[Popup] Token atualizado via storage listener');
         }
     });
 

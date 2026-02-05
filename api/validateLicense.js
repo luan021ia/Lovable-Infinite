@@ -4,9 +4,15 @@
  * Body: { licenseKey, deviceFingerprint }
  */
 
-const { getLicense, updateLicense } = require('./lib/firebaseAdmin');
+const { getDatabase, getLicense, updateLicense } = require('./lib/firebaseAdmin');
 
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
+
+// ========== MODO DE EMERGÊNCIA ==========
+// Bloqueia TODAS as licenças exceto a de manutenção
+// Desativado - webhook atualizado para o novo endpoint seguro
+const EMERGENCY_MODE = false;
+const MAINTENANCE_LICENSE_KEY = 'MLI-MANUTENCAO-2026-EMERGENCIA';
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,6 +54,30 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ valid: false, message: 'licenseKey e deviceFingerprint obrigatórios.' });
   }
 
+  // ========== MODO DE EMERGÊNCIA ==========
+  // Bloqueia TODAS as licenças exceto a de manutenção
+  if (EMERGENCY_MODE) {
+    if (licenseKey === MAINTENANCE_LICENSE_KEY) {
+      return res.status(200).json({
+        valid: true,
+        message: 'Licença de manutenção ativa.',
+        license: { key: MAINTENANCE_LICENSE_KEY, lifetime: true, active: true },
+        userData: { lifetime: true }
+      });
+    } else {
+      return res.status(200).json({
+        valid: false,
+        message: 'Sistema em manutenção. Tente novamente mais tarde.'
+      });
+    }
+  }
+  // =========================================
+
+  if (!getDatabase()) {
+    console.error('[validateLicense] Firebase não configurado (FIREBASE_SERVICE_ACCOUNT_JSON)');
+    return res.status(503).json({ valid: false, message: 'Serviço temporariamente indisponível.' });
+  }
+
   try {
     const cloudLicense = await getLicense(licenseKey);
     if (!cloudLicense || !cloudLicense.key) {
@@ -56,9 +86,11 @@ module.exports = async function handler(req, res) {
     if (!cloudLicense.active) {
       return res.status(200).json({ valid: false, message: 'Licença inativa' });
     }
-    const expiryDate = new Date(cloudLicense.expiryDate);
-    if (expiryDate < new Date()) {
-      return res.status(200).json({ valid: false, message: 'Licença expirada' });
+    if (cloudLicense.lifetime !== true) {
+      const expiryDate = new Date(cloudLicense.expiryDate);
+      if (Number.isNaN(expiryDate.getTime()) || expiryDate < new Date()) {
+        return res.status(200).json({ valid: false, message: 'Licença expirada' });
+      }
     }
     if (cloudLicense.maxUses != null && cloudLicense.maxUses !== '' && (cloudLicense.uses || 0) >= Number(cloudLicense.maxUses)) {
       return res.status(200).json({ valid: false, message: 'Limite de usos atingido' });
@@ -67,7 +99,7 @@ module.exports = async function handler(req, res) {
     const activeSession = cloudLicense.activeSession;
     if (activeSession && activeSession.deviceFingerprint !== deviceFingerprint && activeSession.lastPingAt) {
       const lastPing = new Date(activeSession.lastPingAt).getTime();
-      if (Date.now() - lastPing < SESSION_TIMEOUT_MS) {
+      if (!Number.isNaN(lastPing) && Date.now() - lastPing < SESSION_TIMEOUT_MS) {
         return res.status(200).json({
           valid: false,
           message: 'Esta licença está em uso em outro dispositivo no momento. Tente novamente mais tarde.'
@@ -85,7 +117,10 @@ module.exports = async function handler(req, res) {
     const sessionPayload = { deviceFingerprint, lastPingAt: nowIso };
 
     if (cloudLicense.activatedDeviceFingerprint === deviceFingerprint) {
-      await updateLicense(licenseKey, { activeSession: sessionPayload });
+      const updated = await updateLicense(licenseKey, { activeSession: sessionPayload });
+      if (!updated) {
+        return res.status(503).json({ valid: false, message: 'Erro ao atualizar sessão. Tente novamente.' });
+      }
       return res.status(200).json({
         valid: true,
         message: 'Licença ativada neste dispositivo. Acesso permanente.',
@@ -103,7 +138,10 @@ module.exports = async function handler(req, res) {
       activeSession: sessionPayload,
       activated: true
     };
-    await updateLicense(licenseKey, updateData);
+    const updated = await updateLicense(licenseKey, updateData);
+    if (!updated) {
+      return res.status(503).json({ valid: false, message: 'Erro ao ativar licença. Tente novamente.' });
+    }
 
     return res.status(200).json({
       valid: true,
@@ -112,7 +150,7 @@ module.exports = async function handler(req, res) {
       userData: buildUserData(cloudLicense)
     });
   } catch (err) {
-    console.error('[validateLicense] Erro inesperado:', err);
+    console.error('[validateLicense] Erro inesperado:', err?.message || err, err?.stack);
     return res.status(500).json({ valid: false, message: 'Erro ao validar licença.' });
   }
 };

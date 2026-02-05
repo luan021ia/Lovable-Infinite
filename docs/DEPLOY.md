@@ -14,6 +14,8 @@
 
 Não é necessário criar uma "versão comercial" separada nem outro backend: o Firebase que você já usa resolve.
 
+**Ciclo de teste:** Qualquer serial **não** funciona — a chave precisa existir no Firebase. Crie a licença no **painel admin** e use essa mesma chave na extensão (ou ao testar a API). Detalhes em **docs/CICLO_DE_TESTE_LICENCA.md**.
+
 ---
 
 ## Build da extensão (para produção)

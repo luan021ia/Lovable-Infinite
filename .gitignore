@@ -54,3 +54,4 @@ backup/
 dist/
 build/
 .vercel
+.env*.local

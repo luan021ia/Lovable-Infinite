@@ -15,6 +15,10 @@
     "extensionRelease": {
       ".read": true,
       ".write": false
+    },
+    "panelUsers": {
+      ".read": "auth != null",
+      ".write": false
     }
   }
 }

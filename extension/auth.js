@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const successMessage = document.getElementById('success-message');
     const toggleVisibility = document.getElementById('toggle-visibility');
     const eyeIcon = document.getElementById('eye-icon');
+    const versionNumber = document.getElementById('version-number');
+
+    // Carregar versão do manifest
+    if (versionNumber && chrome.runtime && chrome.runtime.getManifest) {
+        const manifest = chrome.runtime.getManifest();
+        versionNumber.textContent = manifest.version || '?';
+    }
 
     // Toggle password visibility
     toggleVisibility.addEventListener('click', () => {
@@ -61,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ============================================
-    // VALIDAÇÃO DE CHAVE DE LICENÇA
+    // VALIDAÇÃO DE CHAVE DE LICENÇA (Firebase)
     // ============================================
 
     async function validateKey(key) {
@@ -82,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
 
-        // Simular delay de rede
+        // Delay de rede
         await new Promise(resolve => setTimeout(resolve, 500));
 
         // Validar chave
@@ -97,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const deviceFingerprint = await getDeviceFingerprint();
             const firebaseDatabaseURL = (typeof FIREBASE_CONFIG !== 'undefined' && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL) ? FIREBASE_CONFIG.databaseURL : '';
 
-            // Salvar chave, status, expiração e vitalício (para exibir no popup)
+            // Salvar chave, status, expiração e vitalício
             const userData = { ...(result.userData || {}) };
             if (result.license) {
                 if (result.license.expiryDate) userData.expiryDate = result.license.expiryDate;

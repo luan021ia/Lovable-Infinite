@@ -210,8 +210,36 @@
     </main>
 
     <main class="admin-main" id="main-admin" style="display: none;" aria-hidden="true">
+        <div id="alert-admin" class="alert" aria-live="polite"></div>
+
+        <!-- Listagem de usuários do painel -->
         <div class="section">
-            <h2>Criar acesso ao painel</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin-bottom: 0;">Usuários do painel</h2>
+                <button type="button" class="btn btn-secondary" id="btn-refresh-panel-users">Atualizar lista</button>
+            </div>
+            <div class="admin-table-wrap">
+                <table class="license-table" id="panel-users-table">
+                    <thead>
+                        <tr>
+                            <th>E-mail</th>
+                            <th>Nome</th>
+                            <th>Status</th>
+                            <th>Validade</th>
+                            <th>Criado em</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="panel-users-tbody">
+                        <tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Criar novo acesso -->
+        <div class="section">
+            <h2>Criar novo acesso ao painel</h2>
             <p style="color: #94a3b8; margin-bottom: 20px;">Cadastre um usuário para acessar o painel com e-mail e senha. Cada usuário terá seu próprio ambiente de licenças.</p>
             <div class="form-group">
                 <label for="panel-user-email">E-mail do novo usuário</label>
@@ -231,6 +259,47 @@
             </div>
         </div>
     </main>
+
+    <!-- Modal Editar usuário do painel -->
+    <div id="modal-edit-panel-user" class="modal" role="dialog" aria-labelledby="modal-edit-panel-user-title">
+        <div class="modal-content modal-edit">
+            <button type="button" class="modal-close" id="modal-edit-panel-user-close" aria-label="Fechar">×</button>
+            <h2 class="modal-header" id="modal-edit-panel-user-title">Editar usuário</h2>
+            <input type="hidden" id="edit-panel-user-uid" value="">
+            <div class="form-group">
+                <label>E-mail (somente leitura)</label>
+                <div class="license-key" id="edit-panel-user-email-display"></div>
+            </div>
+            <div class="form-group">
+                <label for="edit-panel-user-name">Nome de exibição</label>
+                <input type="text" id="edit-panel-user-name" placeholder="Nome do usuário">
+            </div>
+            <div class="form-group">
+                <label for="edit-panel-user-new-password">Nova senha (deixe em branco para manter)</label>
+                <input type="password" id="edit-panel-user-new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="edit-panel-user-disabled">
+                    <span>Desativar acesso (usuário não conseguirá entrar)</span>
+                </label>
+            </div>
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="edit-panel-user-lifetime">
+                    <span>Acesso vitalício (sem data de expiração)</span>
+                </label>
+            </div>
+            <div class="form-group" id="edit-panel-user-valid-until-group">
+                <label for="edit-panel-user-valid-until">Data de expiração do acesso</label>
+                <input type="date" id="edit-panel-user-valid-until">
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn btn-primary" id="btn-edit-panel-user-submit">Salvar</button>
+                <button type="button" class="btn btn-secondary" id="btn-edit-panel-user-cancel">Cancelar</button>
+            </div>
+        </div>
+    </div>
 
     </div>
 

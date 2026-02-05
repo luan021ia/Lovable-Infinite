@@ -139,6 +139,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('main-licenses').style.display = t === 'licenses' ? 'block' : 'none';
             document.getElementById('main-admin').style.display = t === 'admin' ? 'block' : 'none';
             document.getElementById('main-admin').setAttribute('aria-hidden', t !== 'admin');
+            // Carregar usuários do painel quando abrir a aba
+            if (t === 'admin' && typeof loadPanelUsers === 'function') {
+                loadPanelUsers();
+            }
         });
     });
 });
@@ -190,6 +194,16 @@ function setupEventListeners() {
     document.getElementById('modal-extension-release-download')?.addEventListener('click', function () { window.location.href = '/downloads/LOVABLE_INFINITY.zip'; });
     document.getElementById('btn-download-extension')?.addEventListener('click', function () {
         window.location.href = '/downloads/LOVABLE_INFINITY.zip';
+    });
+
+    // Usuários do painel
+    document.getElementById('btn-refresh-panel-users')?.addEventListener('click', loadPanelUsers);
+    document.getElementById('modal-edit-panel-user-close')?.addEventListener('click', closeEditPanelUserModal);
+    document.getElementById('btn-edit-panel-user-cancel')?.addEventListener('click', closeEditPanelUserModal);
+    document.getElementById('btn-edit-panel-user-submit')?.addEventListener('click', submitEditPanelUser);
+    document.getElementById('edit-panel-user-lifetime')?.addEventListener('change', function () {
+        const group = document.getElementById('edit-panel-user-valid-until-group');
+        if (group) group.style.display = this.checked ? 'none' : 'block';
     });
 }
 
@@ -249,7 +263,8 @@ async function checkExtensionRelease() {
         return;
     }
     try {
-        var res = await fetch('/version.json');
+        // Cache-buster: adiciona timestamp para evitar cache do navegador/CDN
+        var res = await fetch('/version.json?_=' + Date.now());
         if (res.ok) {
             var fallback = await res.json();
             if (fallback && (fallback.version != null || fallback.publishedAt != null)) {
@@ -633,4 +648,234 @@ function closeModal() {
 
 function confirmAction() {
     if (currentAction) currentAction();
+}
+
+// ==================== GERENCIAMENTO DE USUÁRIOS DO PAINEL ====================
+
+let panelUsersCache = [];
+
+async function loadPanelUsers() {
+    const tbody = document.getElementById('panel-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">Carregando...</td></tr>';
+
+    var apiUrl = typeof LIST_PANEL_USERS_API_URL !== 'undefined' ? LIST_PANEL_USERS_API_URL : '';
+    if (!apiUrl || !currentUser) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 24px;">Configure LIST_PANEL_USERS_API_URL ou faça login.</td></tr>';
+        return;
+    }
+
+    try {
+        var token = await currentUser.getIdToken();
+        var res = await fetch(apiUrl, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok || !data.success) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 24px;">' + escapeHtml(data.error || 'Erro ao carregar usuários.') + '</td></tr>';
+            return;
+        }
+        panelUsersCache = data.users || [];
+        renderPanelUsersTable(panelUsersCache);
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 24px;">Erro de conexão.</td></tr>';
+    }
+}
+
+function renderPanelUsersTable(users) {
+    const tbody = document.getElementById('panel-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">Nenhum usuário cadastrado.</td></tr>';
+        return;
+    }
+
+    users.forEach(function (user) {
+        const tr = document.createElement('tr');
+        const isDisabled = !!user.disabled;
+        const validUntil = user.validUntil;
+        const isLifetime = validUntil === -1 || validUntil === '-1' || validUntil === null || validUntil === undefined;
+        let validityText = 'Vitalício';
+        let isExpired = false;
+        if (!isLifetime && validUntil) {
+            const expDate = new Date(Number(validUntil));
+            if (!isNaN(expDate.getTime())) {
+                validityText = expDate.toLocaleDateString('pt-BR');
+                isExpired = expDate < new Date();
+            }
+        }
+        const statusClass = isDisabled ? 'status-inactive' : (isExpired ? 'status-expiring' : 'status-active');
+        const statusText = isDisabled ? 'Desativado' : (isExpired ? 'Expirado' : 'Ativo');
+        const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : '—';
+
+        tr.innerHTML = `
+            <td><div class="license-key" style="font-size: 12px;">${escapeHtml(user.email || '—')}</div></td>
+            <td>${escapeHtml(user.displayName || '—')}</td>
+            <td><span class="status-badge-small ${statusClass}">${statusText}</span></td>
+            <td>${validityText}</td>
+            <td>${createdAt}</td>
+            <td>
+                <div class="action-buttons">
+                    <button type="button" class="action-btn-small btn-edit-panel-user" data-uid="${escapeAttr(user.uid)}">Editar</button>
+                    <button type="button" class="action-btn-small delete btn-delete-panel-user" data-uid="${escapeAttr(user.uid)}" data-email="${escapeAttr(user.email || '')}">Apagar</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    attachPanelUserButtonListeners();
+}
+
+function attachPanelUserButtonListeners() {
+    document.querySelectorAll('.btn-edit-panel-user').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            var uid = e.currentTarget.getAttribute('data-uid');
+            openEditPanelUserModal(uid);
+        });
+    });
+    document.querySelectorAll('.btn-delete-panel-user').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            var uid = e.currentTarget.getAttribute('data-uid');
+            var email = e.currentTarget.getAttribute('data-email');
+            deletePanelUserConfirm(uid, email);
+        });
+    });
+}
+
+function openEditPanelUserModal(uid) {
+    var user = panelUsersCache.find(function (u) { return u.uid === uid; });
+    if (!user) {
+        showAlertAdmin('Usuário não encontrado.', 'error');
+        return;
+    }
+    document.getElementById('edit-panel-user-uid').value = user.uid;
+    document.getElementById('edit-panel-user-email-display').textContent = user.email || '—';
+    document.getElementById('edit-panel-user-name').value = user.displayName || '';
+    document.getElementById('edit-panel-user-new-password').value = '';
+    document.getElementById('edit-panel-user-disabled').checked = !!user.disabled;
+
+    var validUntil = user.validUntil;
+    var isLifetime = validUntil === -1 || validUntil === '-1' || validUntil === null || validUntil === undefined;
+    document.getElementById('edit-panel-user-lifetime').checked = isLifetime;
+    var validGroup = document.getElementById('edit-panel-user-valid-until-group');
+    if (validGroup) validGroup.style.display = isLifetime ? 'none' : 'block';
+
+    if (!isLifetime && validUntil) {
+        var d = new Date(Number(validUntil));
+        if (!isNaN(d.getTime())) {
+            document.getElementById('edit-panel-user-valid-until').value = d.toISOString().slice(0, 10);
+        } else {
+            document.getElementById('edit-panel-user-valid-until').value = '';
+        }
+    } else {
+        document.getElementById('edit-panel-user-valid-until').value = '';
+    }
+
+    document.getElementById('modal-edit-panel-user').classList.add('show');
+}
+
+function closeEditPanelUserModal() {
+    document.getElementById('modal-edit-panel-user').classList.remove('show');
+}
+
+async function submitEditPanelUser() {
+    var uid = document.getElementById('edit-panel-user-uid').value;
+    var displayName = (document.getElementById('edit-panel-user-name').value || '').trim();
+    var newPassword = document.getElementById('edit-panel-user-new-password').value || '';
+    var disabled = document.getElementById('edit-panel-user-disabled').checked;
+    var isLifetime = document.getElementById('edit-panel-user-lifetime').checked;
+    var validUntilInput = document.getElementById('edit-panel-user-valid-until').value;
+
+    var validUntil = -1;
+    if (!isLifetime && validUntilInput) {
+        var d = new Date(validUntilInput + 'T23:59:59.999Z');
+        if (!isNaN(d.getTime())) {
+            validUntil = d.getTime();
+        }
+    }
+
+    if (newPassword && newPassword.length < 6) {
+        showAlertAdmin('A senha deve ter no mínimo 6 caracteres.', 'error');
+        return;
+    }
+
+    var apiUrl = typeof UPDATE_PANEL_USER_API_URL !== 'undefined' ? UPDATE_PANEL_USER_API_URL : '';
+    if (!apiUrl || !currentUser) {
+        showAlertAdmin('Configure UPDATE_PANEL_USER_API_URL ou faça login.', 'error');
+        return;
+    }
+
+    var btn = document.getElementById('btn-edit-panel-user-submit');
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+
+    try {
+        var token = await currentUser.getIdToken();
+        var body = { uid: uid, displayName: displayName, disabled: disabled, validUntil: validUntil };
+        if (newPassword) body.password = newPassword;
+
+        var res = await fetch(apiUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(body)
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok && data.success) {
+            showAlertAdmin('Usuário atualizado com sucesso.', 'success');
+            closeEditPanelUserModal();
+            loadPanelUsers();
+        } else {
+            showAlertAdmin(data.error || 'Erro ao atualizar usuário.', 'error');
+        }
+    } catch (e) {
+        showAlertAdmin('Erro de conexão.', 'error');
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+}
+
+function deletePanelUserConfirm(uid, email) {
+    currentAction = async function () {
+        var apiUrl = typeof DELETE_PANEL_USER_API_URL !== 'undefined' ? DELETE_PANEL_USER_API_URL : '';
+        if (!apiUrl || !currentUser) {
+            showAlertAdmin('Configure DELETE_PANEL_USER_API_URL ou faça login.', 'error');
+            closeModal();
+            return;
+        }
+
+        try {
+            var token = await currentUser.getIdToken();
+            var res = await fetch(apiUrl, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                body: JSON.stringify({ uid: uid })
+            });
+            var data = await res.json().catch(function () { return {}; });
+            if (res.ok && data.success) {
+                showAlertAdmin('Usuário removido com sucesso.', 'success');
+                loadPanelUsers();
+            } else {
+                showAlertAdmin(data.error || 'Erro ao remover usuário.', 'error');
+            }
+        } catch (e) {
+            showAlertAdmin('Erro de conexão.', 'error');
+        }
+        closeModal();
+    };
+    showModal('Apagar usuário', 'Tem certeza que deseja apagar o usuário "' + (email || uid) + '"? Esta ação não pode ser desfeita.');
+}
+
+function showAlertAdmin(message, type) {
+    var el = document.getElementById('alert-admin');
+    if (!el) {
+        // Fallback para alert principal
+        showAlert(message, type);
+        return;
+    }
+    el.textContent = message;
+    el.className = 'alert show alert-' + type;
+    setTimeout(function () { el.classList.remove('show'); }, 5000);
 }

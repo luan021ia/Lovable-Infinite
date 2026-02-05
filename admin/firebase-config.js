@@ -16,8 +16,11 @@
  * Guia completo: pasta docs/FIREBASE_SETUP.md
  */
 
-/** URL do endpoint createPanelUser no Vercel */
+/** URLs dos endpoints de gestão de usuários do painel no Vercel */
 var CREATE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/createPanelUser";
+var LIST_PANEL_USERS_API_URL = "https://lovable-infinity-api.vercel.app/api/listPanelUsers";
+var UPDATE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/updatePanelUser";
+var DELETE_PANEL_USER_API_URL = "https://lovable-infinity-api.vercel.app/api/deletePanelUser";
 /** URL do endpoint publishExtensionRelease no Vercel */
 var PUBLISH_EXTENSION_RELEASE_API_URL = "https://lovable-infinity-api.vercel.app/api/publishExtensionRelease";
 

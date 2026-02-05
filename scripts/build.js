@@ -2,12 +2,19 @@
  * Build automatizado da extensão Chrome - Lovable Infinity
  * Ofusca os JS, copia arquivos e ajusta referências nos HTML.
  * Ao final, compacta a pasta build em LOVABLE_INFINITY.zip.
+ * 
+ * VERSIONAMENTO SEMÂNTICO (SemVer):
+ * - MAJOR (X.0.0): Mudanças grandes, breaking changes, redesigns
+ * - MINOR (0.X.0): Novas funcionalidades, features
+ * - PATCH (0.0.X): Correções de bugs, ajustes pequenos
+ * 
  * Uso: npm run build (na raiz do projeto)
  */
 
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
+const readline = require('readline');
 
 // Raiz do projeto = pasta acima de scripts/
 const ROOT = path.resolve(__dirname, '..');
@@ -86,21 +93,115 @@ function replaceInFile(filePath, replacements) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
+/**
+ * Pergunta ao usuário qual tipo de mudança foi feita
+ * @returns {Promise<string>} 'major', 'minor', 'patch' ou 'skip'
+ */
+function askVersionType() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    log('\n┌─────────────────────────────────────────────────────────┐');
+    log('│           VERSIONAMENTO SEMÂNTICO (SemVer)              │');
+    log('├─────────────────────────────────────────────────────────┤');
+    log('│  [1] PATCH  - Correções de bugs, ajustes pequenos       │');
+    log('│  [2] MINOR  - Novas funcionalidades, features           │');
+    log('│  [3] MAJOR  - Mudanças grandes, breaking changes        │');
+    log('│  [0] SKIP   - Manter versão atual (sem incremento)      │');
+    log('└─────────────────────────────────────────────────────────┘\n');
+
+    rl.question('Qual tipo de mudança? [1/2/3/0]: ', (answer) => {
+      rl.close();
+      const choice = answer.trim();
+      if (choice === '1') resolve('patch');
+      else if (choice === '2') resolve('minor');
+      else if (choice === '3') resolve('major');
+      else if (choice === '0') resolve('skip');
+      else {
+        log('[!] Opção inválida. Assumindo PATCH (correção pequena).');
+        resolve('patch');
+      }
+    });
+  });
+}
+
+/**
+ * Incrementa a versão de acordo com o tipo de mudança
+ * @param {string} currentVersion - Versão atual (ex: "3.1.2")
+ * @param {string} type - Tipo de mudança: 'major', 'minor', 'patch'
+ * @returns {string} Nova versão
+ */
+function incrementVersion(currentVersion, type) {
+  const parts = currentVersion.split('.').map(Number);
+  let [major, minor, patch] = parts;
+  
+  // Garantir valores válidos
+  major = isNaN(major) ? 1 : major;
+  minor = isNaN(minor) ? 0 : minor;
+  patch = isNaN(patch) ? 0 : patch;
+
+  switch (type) {
+    case 'major':
+      major++;
+      minor = 0;
+      patch = 0;
+      break;
+    case 'minor':
+      minor++;
+      patch = 0;
+      break;
+    case 'patch':
+    default:
+      patch++;
+      break;
+  }
+
+  return `${major}.${minor}.${patch}`;
+}
+
 async function main() {
   log('============================================');
   log(' BUILD DA EXTENSÃO CHROME - Lovable Infinity');
-  log('============================================\n');
+  log('============================================');
 
-  // 0) Propagar versão de package.json para extension/manifest.json (fonte única de versão)
+  // 0) Ler versão atual e perguntar sobre versionamento
   const pkgPath = path.join(ROOT, 'package.json');
   const manifestPath = path.join(EXT, 'manifest.json');
-  if (fs.existsSync(pkgPath) && fs.existsSync(manifestPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    const version = (pkg.version && String(pkg.version).trim()) || '1.0.0';
+  
+  let currentVersion = '1.0.0';
+  let pkg = {};
+  
+  if (fs.existsSync(pkgPath)) {
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    currentVersion = (pkg.version && String(pkg.version).trim()) || '1.0.0';
+  }
+
+  log(`\nVersão atual: ${currentVersion}`);
+
+  // Perguntar tipo de mudança
+  const versionType = await askVersionType();
+  
+  let newVersion = currentVersion;
+  if (versionType !== 'skip') {
+    newVersion = incrementVersion(currentVersion, versionType);
+    
+    // Atualizar package.json
+    pkg.version = newVersion;
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 4), 'utf8');
+    log(`[*] Versão atualizada: ${currentVersion} → ${newVersion} (${versionType.toUpperCase()})\n`);
+  } else {
+    log(`[*] Mantendo versão atual: ${currentVersion}\n`);
+  }
+
+  // Propagar versão para extension/manifest.json
+  if (fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    manifest.version = version;
+    manifest.version = newVersion;
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 4), 'utf8');
-    log('[*] Versão propagada para extension/manifest.json: ' + version + '\n');
+    log('[*] Versão propagada para extension/manifest.json: ' + newVersion + '\n');
   }
 
   // 1) Carregar ofuscador
@@ -202,13 +303,9 @@ async function main() {
 
   // 8b) Gerar admin/version.json (versão + data do deploy para a barra do painel)
   const versionPath = path.join(ROOT, 'admin', 'version.json');
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    const version = (pkg.version && String(pkg.version).trim()) || '1.0.0';
-    const versionPayload = { version: version, publishedAt: Date.now() };
-    fs.writeFileSync(versionPath, JSON.stringify(versionPayload, null, 0), 'utf8');
-    log('[*] admin/version.json gerado (versão ' + version + ', publishedAt: ' + versionPayload.publishedAt + ').');
-  }
+  const versionPayload = { version: newVersion, publishedAt: Date.now() };
+  fs.writeFileSync(versionPath, JSON.stringify(versionPayload, null, 0), 'utf8');
+  log('[*] admin/version.json gerado (versão ' + newVersion + ', publishedAt: ' + versionPayload.publishedAt + ').');
 
   // 9) Deploy no Firebase Hosting (painel + ZIP disponível)
   log('\n[*] Executando deploy no Firebase (hosting)...');
@@ -223,6 +320,7 @@ async function main() {
   log('\n============================================');
   log(' CONCLUÍDO COM SUCESSO');
   log('============================================\n');
+  log(`[+] Versão: ${newVersion}`);
   log(`[+] Build criado em: extension\\build\\`);
   log('[+] ZIP gerado na raiz: ' + ZIP_NAME);
   log('[+] ZIP copiado em: admin\\downloads\\' + ZIP_NAME);

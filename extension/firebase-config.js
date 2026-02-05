@@ -1,23 +1,10 @@
 /**
  * Configuração do Firebase - Lovable Infinity
  * Sistema de Licenças na Nuvem
- *
- * CONEXÃO DO ZERO: Este projeto está desconectado do Firebase antigo.
- * Configure seu NOVO projeto Firebase abaixo (dados do Console Firebase).
- *
- * Passos:
- * 1. Acesse https://console.firebase.google.com
- * 2. Crie um novo projeto (ou use um existente)
- * 3. Ative o Realtime Database (crie o banco se pedir)
- * 4. Em Configurações do projeto > Geral > Seus apps > adicione um app Web
- * 5. Copie o objeto firebaseConfig e preencha FIREBASE_CONFIG abaixo
- * 6. A databaseURL deve ser algo como: https://SEU-PROJECT-ID-default-rtdb.firebaseio.com
- *
- * Guia completo: pasta docs/FIREBASE_SETUP.md
  */
 
 const FIREBASE_CONFIG = {
-    apiKey: "",           // Opcional para licenças; preencha se for usar Hosting/outros
+    apiKey: "",
     authDomain: "",
     databaseURL: "https://lovable2-e6f7f-default-rtdb.firebaseio.com",
     projectId: "lovable2-e6f7f",
@@ -170,63 +157,4 @@ async function deleteLicenseFromCloud(key) {
     }
 }
 
-async function syncLicensesWithCloud() {
-    try {
-        const localLicenses = await licenseManager.getAllLicenses();
-        let saved = 0;
-        for (const license of localLicenses) {
-            const result = await saveLicenseToCloud(license);
-            if (result) saved++;
-        }
-        return { success: true, message: 'Sincronizadas ' + saved + ' licenças' };
-    } catch (error) {
-        return { success: false, message: 'Erro ao sincronizar.' };
-    }
-}
-
 initializeFirebase();
-
-async function saveAdminPasswordToCloud(passwordHash) {
-    try {
-        await firebaseRequest('/admin/password', 'PUT', passwordHash);
-        return true;
-    } catch (error) {
-        return false;
-    }
-}
-
-async function getAdminPasswordFromCloud() {
-    try {
-        const result = await firebaseRequest('/admin/password');
-        return result || null;
-    } catch (error) {
-        return null;
-    }
-}
-
-async function getAdminUsernameFromCloud() {
-    try {
-        const result = await firebaseRequest('/admin/username');
-        return result || null;
-    } catch (error) {
-        return null;
-    }
-}
-
-async function saveAdminUsernameToCloud(username) {
-    try {
-        await firebaseRequest('/admin/username', 'PUT', username);
-        return true;
-    } catch (error) {
-        return false;
-    }
-}
-
-async function deleteAdminPasswordFromCloud() {
-    try {
-        await firebaseRequest('/admin/password', 'DELETE');
-        return true;
-    } catch (error) {
-        return false;
-    }
-}

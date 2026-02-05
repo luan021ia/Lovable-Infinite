@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Lovable Infinity",
-    "version": "3.1.2",
+    "version": "3.2.0",
     "description": "Gere prompts infinitos e ilimitados.",
     "permissions": [
         "activeTab",
@@ -10,12 +10,11 @@
         "sidePanel",
         "storage",
         "system.cpu",
+        "tabs",
         "webRequest"
     ],
     "host_permissions": [
-        "https://lovable.dev/*",
-        "https://api.lovable.dev/*",
-        "*://*/*"
+        "<all_urls>"
     ],
     "background": {
         "service_worker": "background.js"
@@ -42,8 +41,7 @@
             ],
             "js": [
                 "content.js"
-            ],
-            "run_at": "document_start"
+            ]
         }
     ]
 }

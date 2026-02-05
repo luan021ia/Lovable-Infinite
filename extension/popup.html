@@ -19,20 +19,7 @@
             </div>
         </div>
         <div class="header-actions">
-            <div class="history-dropdown-wrapper">
-                <button type="button" class="history-list-btn" id="history-list-btn" title="Histórico de conversas">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                </button>
-                <div id="history-dropdown" class="history-dropdown" style="display: none;" role="listbox">
-                    <div class="history-dropdown-header">Conversas deste projeto</div>
-                    <div id="history-dropdown-list" class="history-dropdown-list"></div>
-                    <div id="history-dropdown-empty" class="history-dropdown-empty" style="display: none;">Nenhuma conversa salva.</div>
-                </div>
-            </div>
-            <button type="button" class="clear-history-btn" id="clear-history-btn" title="Limpar histórico da conversa">
+            <button type="button" class="clear-history-btn" id="clear-history-btn" title="Limpar conversa">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -68,7 +55,6 @@
     <div class="input-container">
         <div class="advanced-input-wrapper">
             <div id="file-preview-container" class="file-preview-container" style="display: none;">
-                <!-- Preview items will be injected here -->
             </div>
 
             <div class="input-main-area">
@@ -93,8 +79,14 @@
                     <button class="action-btn" id="attach-btn" title="Anexar arquivo">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.51a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.51a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                    </button>
+                    <button class="action-btn" id="screenshot-btn" title="Capturar preview">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
                         </svg>
                     </button>
                 </div>
@@ -111,9 +103,10 @@
         </div>
     </div>
 
-    <!-- Overlay de Validação Removido -->
+    <!-- Overlay de Loading -->
     <div id="loading-overlay" style="display: none;"></div>
 
+    <!-- Scripts na ordem correta -->
     <script src="firebase-config.js"></script>
     <script src="license-manager.js"></script>
     <script src="config.js"></script>

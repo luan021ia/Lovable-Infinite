@@ -4,6 +4,16 @@ Extensão Chrome (side panel) para Lovable.dev + painel administrativo de licen�
 
 **Versão da extensão:** ver `version` em [package.json](package.json). O build propaga essa versão para `extension/manifest.json` e para o painel (ver [Versionamento](#versionamento)).
 
+---
+
+## ⚠️ EXTENSÃO QUEBROU? CHEGOU ATUALIZAÇÃO EXTERNA?
+
+**→ [CLIQUE AQUI: Protocolo de Emergência](docs/EMERGENCIA_ATUALIZACAO_EXTERNA.md)**
+
+Use quando receber uma nova versão externa com a comunicação funcionando e precisar integrar na nossa extensão mantendo todas as funcionalidades.
+
+---
+
 ## Versionamento
 
 - **Fonte única:** A versão da extensão fica em **package.json** (campo `version`).

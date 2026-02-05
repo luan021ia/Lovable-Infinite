@@ -6,67 +6,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Autenticação - Lovable Infinity</title>
     <link rel="stylesheet" href="styles.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         html, body {
             width: 100%;
-            max-width: 380px;
-            min-width: 320px;
-            min-height: 100%;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            min-width: 280px;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
             background-color: var(--bg-primary);
+        }
+        .auth-container {
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            padding: 40px 28px;
+            display: flex;
+            flex-direction: column;
             box-sizing: border-box;
+        }
+        .auth-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .auth-content > * {
+            width: 100%;
+            max-width: 320px;
+        }
+        .auth-logo {
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .auth-title {
+            text-align: center;
+        }
+        .auth-subtitle {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .auth-footer {
+            margin-top: auto;
+            padding-top: 20px;
         }
     </style>
 </head>
 
 <body>
     <div class="auth-container">
-        <div class="auth-logo">
-            <div class="auth-logo-text">∞ Lovable Infinity</div>
-        </div>
-
-        <h1 class="auth-title">Acesso Premium</h1>
-        <p class="auth-subtitle">Insira sua licença para desbloquear o poder ilimitado do Lovable Infinity</p>
-
-        <div class="error-message" id="error-message"></div>
-        <div class="success-message" id="success-message"></div>
-
-        <form id="auth-form">
-            <div class="form-group">
-                <label for="license-key">Chave de Licença</label>
-                <div class="key-input-wrapper">
-                    <input type="password" id="license-key" class="key-input" placeholder="••••-••••-••••-••••"
-                        autocomplete="off" required>
-                    <button type="button" class="toggle-visibility" id="toggle-visibility" title="Mostrar/ocultar chave">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                            id="eye-icon">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-                </div>
+        <div class="auth-content">
+            <div class="auth-logo">
+                <div class="auth-logo-text">∞ Lovable Infinity</div>
             </div>
 
-            <button type="submit" class="auth-button" id="auth-button">
-                <span id="button-text">Ativar Agora</span>
-                <div class="loading-spinner" id="loading-spinner"
-                    style="border-top-color: #000; width: 18px; height: 18px;"></div>
-            </button>
-        </form>
+            <h1 class="auth-title">Acesso Premium</h1>
+            <p class="auth-subtitle">Insira sua licença para desbloquear o poder ilimitado</p>
 
-            <div class="auth-footer">
-            Lovable Infinity • Version 3.1
+            <div class="error-message" id="error-message"></div>
+            <div class="success-message" id="success-message"></div>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="license-key">Chave de Licença</label>
+                    <div class="key-input-wrapper">
+                        <input type="password" id="license-key" class="key-input" placeholder="••••••••••••••••••••••••••••"
+                            autocomplete="off" required>
+                        <button type="button" class="toggle-visibility" id="toggle-visibility" title="Mostrar/ocultar chave">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                id="eye-icon">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="auth-button" id="auth-button">
+                    <span id="button-text">Ativar Agora</span>
+                    <div class="loading-spinner" id="loading-spinner"></div>
+                </button>
+            </form>
+        </div>
+
+        <div class="auth-footer" id="auth-footer">
+            Lovable Infinity • Version <span id="version-number">...</span>
         </div>
     </div>
 
-    <!-- Firebase Config (sem SDK externo, usa REST API) -->
+    <!-- Scripts na ordem correta -->
     <script src="firebase-config.js"></script>
     <script src="license-manager.js"></script>
     <script src="config.js"></script>

@@ -144,17 +144,49 @@ async function getLicense(key) {
   }
 }
 
+function sanitizeForFirebase(obj) {
+  if (obj == null || typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined) continue;
+    if (v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date)) {
+      out[k] = sanitizeForFirebase(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 async function updateLicense(key, updates) {
   const ref = getLicenseRef(key);
   if (!ref) return false;
   try {
     const merged = { ...updates, timestamp: new Date().toISOString() };
-    await ref.update(merged);
+    const sanitized = sanitizeForFirebase(merged);
+    await ref.update(sanitized);
     return true;
   } catch (err) {
-    console.error('[updateLicense] Erro ao atualizar licença:', key, err);
+    console.error('[updateLicense] Erro ao atualizar licença:', key, err?.message || err);
     return false;
   }
+}
+
+/**
+ * Faz parse do body da requisição (suporta objeto ou string JSON)
+ */
+function parseBody(req) {
+  const raw = req.body;
+  if (raw == null) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
 }
 
 module.exports = {

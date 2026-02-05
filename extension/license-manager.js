@@ -84,9 +84,6 @@ class LicenseManager {
     /**
      * Gera uma licença única
      * Formato: MLI-XXXXXXXX-XXXXXXXX-XXXXXXXX
-     * 
-     * ⚠️ IMPORTANTE: Esta licença pode ser usada em MÚLTIPLAS MÁQUINAS
-     * Cada máquina que usar a licença terá seu próprio HWID registrado
      */
     async generateLicense(expiryDays = 30, maxUses = null, userName = '', userPhone = '') {
         const generateSegment = () => {
@@ -100,11 +97,11 @@ class LicenseManager {
             created: new Date().toISOString(),
             activated: false,
             activatedDate: null,
-            activatedDevices: [], // Array de dispositivos que usaram esta licença
+            activatedDevices: [],
             expiryDate: this.getExpiryDate(expiryDays),
             active: true,
             uses: 0,
-            maxUses: maxUses, // null = ilimitado
+            maxUses: maxUses,
             description: '',
             userName: userName || 'Sem nome',
             userPhone: userPhone || 'Sem telefone'
@@ -113,7 +110,6 @@ class LicenseManager {
         this.licenses.push(licenseData);
         await this.saveLicenses();
         
-        // Sincronizar com Firebase
         if (typeof saveLicenseToCloud !== 'undefined') {
             await saveLicenseToCloud(licenseData);
         }
@@ -131,69 +127,61 @@ class LicenseManager {
     }
 
     /**
-     * Valida uma licenca
-     * Funciona em qualquer maquina
-     * Multiplos usuarios podem usar a mesma licenca
-     * Consulta Firebase primeiro (nuvem)
+     * Valida uma licença
      */
     async validateLicense(key) {
-        // Tentar carregar da nuvem primeiro
         if (typeof getLicenseFromCloud !== 'undefined') {
             try {
                 const cloudLicense = await getLicenseFromCloud(key);
                 if (cloudLicense) {
-                    // Validar licenca da nuvem
                     if (!cloudLicense.active) {
-                        return { valid: false, message: 'Licenca desativada' };
+                        return { valid: false, message: 'Licença desativada' };
                     }
 
                     const now = new Date();
                     const expiry = new Date(cloudLicense.expiryDate);
 
                     if (now > expiry) {
-                        return { valid: false, message: 'Licenca expirada' };
+                        return { valid: false, message: 'Licença expirada' };
                     }
 
                     if (cloudLicense.maxUses && cloudLicense.uses >= cloudLicense.maxUses) {
                         return { valid: false, message: 'Limite de usos atingido' };
                     }
 
-                    return { valid: true, message: 'Licenca valida (nuvem)', license: cloudLicense };
+                    return { valid: true, message: 'Licença válida (nuvem)', license: cloudLicense };
                 }
             } catch (error) {}
         }
 
-        // Fallback: validar localmente
         await this.loadLicenses();
         
         const license = this.licenses.find(l => l.key === key);
 
         if (!license) {
-            return { valid: false, message: 'Licenca nao encontrada' };
+            return { valid: false, message: 'Licença não encontrada' };
         }
 
         if (!license.active) {
-            return { valid: false, message: 'Licenca desativada' };
+            return { valid: false, message: 'Licença desativada' };
         }
 
         const now = new Date();
         const expiry = new Date(license.expiryDate);
 
         if (now > expiry) {
-            return { valid: false, message: 'Licenca expirada' };
+            return { valid: false, message: 'Licença expirada' };
         }
 
         if (license.maxUses && license.uses >= license.maxUses) {
             return { valid: false, message: 'Limite de usos atingido' };
         }
 
-        return { valid: true, message: 'Licenca valida (local)', license };
+        return { valid: true, message: 'Licença válida (local)', license };
     }
 
     /**
      * Ativa uma licença em um dispositivo
-     * ✅ Cada máquina/dispositivo pode ativar a mesma licença
-     * ✅ O sistema rastreia qual dispositivo ativou
      */
     async activateLicense(key, deviceId) {
         await this.loadLicenses();
@@ -208,7 +196,6 @@ class LicenseManager {
         license.activatedDate = new Date().toISOString();
         license.uses = (license.uses || 0) + 1;
 
-        // Adicionar dispositivo à lista se não estiver lá
         if (!license.activatedDevices) {
             license.activatedDevices = [];
         }
@@ -230,7 +217,7 @@ class LicenseManager {
     }
 
     /**
-     * Deleta uma licença (local e Firebase)
+     * Deleta uma licença
      */
     async deleteLicense(key) {
         await this.loadLicenses();
@@ -240,7 +227,6 @@ class LicenseManager {
             this.licenses.splice(index, 1);
             await this.saveLicenses();
             
-            // Deletar do Firebase também
             if (typeof deleteLicenseFromCloud !== 'undefined') {
                 try {
                     await deleteLicenseFromCloud(key);
@@ -269,147 +255,12 @@ class LicenseManager {
     }
 
     /**
-     * Desativa uma licença
-     */
-    async deactivateLicense(key) {
-        return this.editLicense(key, { active: false });
-    }
-
-    /**
-     * Reativa uma licença
-     */
-    async reactivateLicense(key) {
-        return this.editLicense(key, { active: true });
-    }
-
-    /**
-     * Define senha de admin
-     */
-    async setAdminPassword(password) {
-        const hashed = this.hashPassword(password);
-
-        if (hasChromeStorage()) {
-            await new Promise((resolve) => {
-                chrome.storage.local.set({
-                    [this.ADMIN_KEY]: hashed
-                }, resolve);
-            });
-        }
-
-        if (typeof saveAdminPasswordToCloud !== 'undefined') {
-            try {
-                await saveAdminPasswordToCloud(hashed);
-            } catch (error) {}
-        }
-        
-        return { success: true, message: 'Senha de admin definida e sincronizada' };
-    }
-
-    /**
-     * Verifica senha de admin
-     */
-    async verifyAdminPassword(password, callback) {
-        let storedHash = null;
-        if (hasChromeStorage()) {
-            const result = await new Promise((resolve) => {
-                chrome.storage.local.get([this.ADMIN_KEY], (r) => resolve(r));
-            });
-            storedHash = result[this.ADMIN_KEY];
-        }
-        if (!storedHash && typeof getAdminPasswordFromCloud !== 'undefined') {
-            try {
-                storedHash = await getAdminPasswordFromCloud();
-                if (storedHash && hasChromeStorage()) {
-                    chrome.storage.local.set({ [this.ADMIN_KEY]: storedHash });
-                }
-            } catch (e) {}
-        }
-        if (!storedHash) {
-            callback(true);
-            return;
-        }
-        const hashed = this.hashPassword(password);
-        callback(hashed === storedHash);
-    }
-
-    /**
-     * Hash simples de senha
-     */
-    hashPassword(password) {
-        let hash = 0;
-        for (let i = 0; i < password.length; i++) {
-            const char = password.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        return 'hash_' + Math.abs(hash).toString(16);
-    }
-
-    /**
-     * Exporta licenças como JSON
-     */
-    async exportLicenses() {
-        await this.loadLicenses();
-        return JSON.stringify(this.licenses, null, 2);
-    }
-
-    /**
-     * Importa licenças de JSON
-     */
-    async importLicenses(jsonData) {
-        try {
-            const imported = JSON.parse(jsonData);
-            if (Array.isArray(imported)) {
-                this.licenses = imported;
-                await this.saveLicenses();
-                return { success: true, message: 'Licenças importadas com sucesso' };
-            }
-            return { success: false, message: 'Formato inválido' };
-        } catch (e) {
-            return { success: false, message: 'Erro ao importar: ' + e.message };
-        }
-    }
-
-    /**
-     * Obtém estatísticas
-     */
-    async getStats() {
-        await this.loadLicenses();
-        
-        const total = this.licenses.length;
-        const active = this.licenses.filter(l => l.active).length;
-        const activated = this.licenses.filter(l => l.activated).length;
-        const expired = this.licenses.filter(l => {
-            const now = new Date();
-            const expiry = new Date(l.expiryDate);
-            return now > expiry;
-        }).length;
-
-        return {
-            total,
-            active,
-            activated,
-            expired,
-            available: active - expired
-        };
-    }
-
-    /**
      * Obtém informações de uma licença
      */
     async getLicenseInfo(key) {
         await this.loadLicenses();
         const license = this.licenses.find(l => l.key === key);
         return license || null;
-    }
-
-    /**
-     * Limpa todas as licenças
-     */
-    async clearAllLicenses() {
-        this.licenses = [];
-        await this.saveLicenses();
-        return { success: true, message: 'Todas as licenças foram deletadas' };
     }
 }
 
