@@ -453,8 +453,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 const base64 = btoa(binary);
                 const dataUrl = `data:application/zip;base64,${base64}`;
                 
-                // Nome do arquivo com timestamp
-                const timestamp = new Date().toISOString().slice(0, 10);
+                // Nome do arquivo com timestamp único (YYYYMMDD-HHmmss)
+                const now = new Date();
+                const timestamp = now.getFullYear().toString() +
+                    (now.getMonth() + 1).toString().padStart(2, '0') +
+                    now.getDate().toString().padStart(2, '0') + '-' +
+                    now.getHours().toString().padStart(2, '0') +
+                    now.getMinutes().toString().padStart(2, '0') +
+                    now.getSeconds().toString().padStart(2, '0');
                 const filename = `lovable-project-${projectId.slice(0, 8)}-${timestamp}.zip`;
 
                 // Inicia o download
