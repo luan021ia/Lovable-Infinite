@@ -3,10 +3,11 @@
  * Ofusca os JS, copia arquivos e ajusta referências nos HTML.
  * Ao final, compacta a pasta build em LOVABLE_INFINITY.zip.
  * 
- * VERSIONAMENTO SEMÂNTICO (SemVer):
- * - MAJOR (X.0.0): Mudanças grandes, breaking changes, redesigns
- * - MINOR (0.X.0): Novas funcionalidades, features
- * - PATCH (0.0.X): Correções de bugs, ajustes pequenos
+ * VERSIONAMENTO SEMÂNTICO (SemVer) - AUTOMÁTICO:
+ * - Por padrão: incrementa PATCH automaticamente
+ * - Para MINOR: npm run build -- minor
+ * - Para MAJOR: npm run build -- major
+ * - Para manter: npm run build -- skip
  * 
  * Uso: npm run build (na raiz do projeto)
  */
@@ -14,7 +15,6 @@
 const fs = require('fs');
 const path = require('path');
 const archiver = require('archiver');
-const readline = require('readline');
 
 // Raiz do projeto = pasta acima de scripts/
 const ROOT = path.resolve(__dirname, '..');
@@ -96,38 +96,19 @@ function replaceInFile(filePath, replacements) {
 }
 
 /**
- * Pergunta ao usuário qual tipo de mudança foi feita
- * @returns {Promise<string>} 'major', 'minor', 'patch' ou 'skip'
+ * Obtém o tipo de versionamento via argumento da linha de comando
+ * @returns {string} 'major', 'minor', 'patch' ou 'skip'
  */
-function askVersionType() {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-
-    log('\n┌─────────────────────────────────────────────────────────┐');
-    log('│           VERSIONAMENTO SEMÂNTICO (SemVer)              │');
-    log('├─────────────────────────────────────────────────────────┤');
-    log('│  [1] PATCH  - Correções de bugs, ajustes pequenos       │');
-    log('│  [2] MINOR  - Novas funcionalidades, features           │');
-    log('│  [3] MAJOR  - Mudanças grandes, breaking changes        │');
-    log('│  [0] SKIP   - Manter versão atual (sem incremento)      │');
-    log('└─────────────────────────────────────────────────────────┘\n');
-
-    rl.question('Qual tipo de mudança? [1/2/3/0]: ', (answer) => {
-      rl.close();
-      const choice = answer.trim();
-      if (choice === '1') resolve('patch');
-      else if (choice === '2') resolve('minor');
-      else if (choice === '3') resolve('major');
-      else if (choice === '0') resolve('skip');
-      else {
-        log('[!] Opção inválida. Assumindo PATCH (correção pequena).');
-        resolve('patch');
-      }
-    });
-  });
+function getVersionType() {
+  const args = process.argv.slice(2);
+  const arg = (args[0] || '').toLowerCase().trim();
+  
+  if (arg === 'major') return 'major';
+  if (arg === 'minor') return 'minor';
+  if (arg === 'skip' || arg === 'none' || arg === '0') return 'skip';
+  
+  // Padrão: PATCH (automático)
+  return 'patch';
 }
 
 /**
@@ -181,10 +162,8 @@ async function main() {
     currentVersion = (pkg.version && String(pkg.version).trim()) || '1.0.0';
   }
 
-  log(`\nVersão atual: ${currentVersion}`);
-
-  // Perguntar tipo de mudança
-  const versionType = await askVersionType();
+  // Obtém tipo de versionamento via argumento (padrão: patch)
+  const versionType = getVersionType();
   
   let newVersion = currentVersion;
   if (versionType !== 'skip') {
@@ -193,9 +172,9 @@ async function main() {
     // Atualizar package.json
     pkg.version = newVersion;
     fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 4), 'utf8');
-    log(`[*] Versão atualizada: ${currentVersion} → ${newVersion} (${versionType.toUpperCase()})\n`);
+    log(`[*] Versão: ${currentVersion} → ${newVersion} (${versionType.toUpperCase()})\n`);
   } else {
-    log(`[*] Mantendo versão atual: ${currentVersion}\n`);
+    log(`[*] Versão mantida: ${currentVersion}\n`);
   }
 
   // Propagar versão para extension/manifest.json
