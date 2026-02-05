@@ -1,7 +1,124 @@
 // Background service worker - Lovable Infinity (baseado na lógica funcional do PROMPTXV2)
 (function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
 
+// Importa utilitários auxiliares (c3.js em produção, zip-utils.js em dev)
+try { importScripts('c3.js'); } catch(e) { importScripts('zip-utils.js'); }
+
 const LOVABLE_ORIGIN = 'https://lovable.dev';
+
+// ============================================
+// FUNÇÕES DE LIMPEZA DO BRANDING LOVABLE
+// ============================================
+
+/**
+ * Remove referências ao Lovable de arquivos do projeto
+ * @param {string} filename - Nome do arquivo
+ * @param {string} content - Conteúdo do arquivo (texto)
+ * @returns {string} - Conteúdo limpo
+ */
+function cleanLovableBranding(filename, content) {
+    // index.html - limpa meta tags e títulos
+    if (filename === 'index.html') {
+        content = content
+            // Título genérico
+            .replace(/<title>Lovable App<\/title>/gi, '<title>My App</title>')
+            .replace(/<title>.*Lovable.*<\/title>/gi, '<title>My App</title>')
+            // Meta description
+            .replace(/<meta\s+name="description"\s+content="Lovable Generated Project"\s*\/?>/gi, 
+                '<meta name="description" content="My Application" />')
+            // Meta author
+            .replace(/<meta\s+name="author"\s+content="Lovable"\s*\/?>/gi, '')
+            // Open Graph
+            .replace(/<meta\s+property="og:title"\s+content="Lovable App"\s*\/?>/gi, 
+                '<meta property="og:title" content="My App" />')
+            .replace(/<meta\s+property="og:description"\s+content="Lovable Generated Project"\s*\/?>/gi, 
+                '<meta property="og:description" content="My Application" />')
+            .replace(/<meta\s+property="og:image"\s+content="https:\/\/lovable\.dev[^"]*"\s*\/?>/gi, '')
+            // Twitter
+            .replace(/<meta\s+name="twitter:site"\s+content="@Lovable"\s*\/?>/gi, '')
+            .replace(/<meta\s+name="twitter:image"\s+content="https:\/\/lovable\.dev[^"]*"\s*\/?>/gi, '')
+            // Limpa linhas vazias extras
+            .replace(/\n\s*\n\s*\n/g, '\n\n');
+    }
+    
+    // vite.config.ts - remove o lovable-tagger
+    if (filename === 'vite.config.ts') {
+        content = content
+            // Remove import do lovable-tagger
+            .replace(/import\s*{\s*componentTagger\s*}\s*from\s*["']lovable-tagger["'];\s*\n?/g, '')
+            // Remove o plugin do array (várias formas possíveis)
+            .replace(/,?\s*mode\s*===\s*["']development["']\s*&&\s*componentTagger\(\)/g, '')
+            .replace(/mode\s*===\s*["']development["']\s*&&\s*componentTagger\(\)\s*,?/g, '')
+            // Limpa array de plugins se ficou com vírgulas extras
+            .replace(/\[\s*,/g, '[')
+            .replace(/,\s*\]/g, ']')
+            .replace(/,\s*,/g, ',');
+    }
+    
+    // package.json - remove dependência do lovable-tagger
+    if (filename === 'package.json') {
+        try {
+            const pkg = JSON.parse(content);
+            // Remove das devDependencies
+            if (pkg.devDependencies && pkg.devDependencies['lovable-tagger']) {
+                delete pkg.devDependencies['lovable-tagger'];
+            }
+            // Remove das dependencies (caso esteja lá)
+            if (pkg.dependencies && pkg.dependencies['lovable-tagger']) {
+                delete pkg.dependencies['lovable-tagger'];
+            }
+            content = JSON.stringify(pkg, null, 2);
+        } catch (e) {
+            // Se falhar o parse, faz replace simples
+            content = content.replace(/,?\s*"lovable-tagger":\s*"[^"]*"\s*,?/g, '');
+        }
+    }
+    
+    // README.md - substitui por um README genérico
+    if (filename === 'README.md') {
+        // Verifica se é o README padrão do Lovable
+        if (content.includes('Welcome to your Lovable project') || content.includes('lovable.dev/projects')) {
+            content = `# My Project
+
+This project was bootstrapped with React + Vite + TypeScript.
+
+## Getting Started
+
+\`\`\`bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+\`\`\`
+
+## Tech Stack
+
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui components
+`;
+        }
+    }
+    
+    return content;
+}
+
+/**
+ * Verifica se um arquivo deve ser completamente removido
+ * @param {string} filename - Nome do arquivo
+ * @returns {boolean} - true se deve ser removido
+ */
+function shouldRemoveFile(filename) {
+    // Por enquanto, não removemos nenhum arquivo, apenas limpamos
+    // Mas podemos adicionar arquivos específicos do Lovable aqui no futuro
+    return false;
+}
 
 function isLovableTab(url) {
     if (!url) return false;
@@ -219,6 +336,146 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 sendResponse({ success: false, error: error.message });
             });
         return true;
+    }
+
+    // Download de projeto - busca código-fonte via API do Lovable e gera ZIP
+    if (request.action === "downloadProject") {
+        const projectId = (request.projectId || '').trim();
+        const token = (request.token || '').trim();
+
+        if (!projectId || !token) {
+            sendResponse({ success: false, error: 'Projeto ou token ausente.' });
+            return false;
+        }
+
+        (async () => {
+            try {
+                // Chama a API do Lovable para obter o código-fonte
+                const apiUrl = `https://api.lovable.dev/projects/${projectId}/source-code`;
+                const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        sendResponse({ success: false, error: 'Token expirado. Recarregue a página do Lovable.' });
+                        return;
+                    }
+                    if (response.status === 403) {
+                        sendResponse({ success: false, error: 'Sem permissão para acessar este projeto.' });
+                        return;
+                    }
+                    if (response.status === 404) {
+                        sendResponse({ success: false, error: 'Projeto não encontrado.' });
+                        return;
+                    }
+                    sendResponse({ success: false, error: `Erro da API: ${response.status}` });
+                    return;
+                }
+
+                const data = await response.json();
+                
+                if (!data.files || !Array.isArray(data.files)) {
+                    sendResponse({ success: false, error: 'Resposta da API inválida.' });
+                    return;
+                }
+
+                // Prepara os arquivos para o ZIP (com limpeza do branding Lovable)
+                const zipFiles = [];
+                let skippedFiles = 0;
+                let cleanedFiles = 0;
+
+                for (const file of data.files) {
+                    // Pula arquivos que excederam o tamanho
+                    if (file.sizeExceeded) {
+                        skippedFiles++;
+                        continue;
+                    }
+
+                    // Pula arquivos sem conteúdo
+                    if (file.contents === null || file.contents === undefined) {
+                        continue;
+                    }
+
+                    // Verifica se o arquivo deve ser removido
+                    if (shouldRemoveFile(file.name)) {
+                        continue;
+                    }
+
+                    let content;
+                    if (file.binary) {
+                        // Decodifica base64 para binário (não limpa binários)
+                        const binaryString = atob(file.contents);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        content = bytes;
+                    } else {
+                        // Texto: aplica limpeza do branding Lovable
+                        let textContent = file.contents;
+                        const originalLength = textContent.length;
+                        
+                        // Aplica limpeza baseada no nome do arquivo
+                        textContent = cleanLovableBranding(file.name, textContent);
+                        
+                        if (textContent.length !== originalLength) {
+                            cleanedFiles++;
+                        }
+                        
+                        content = new TextEncoder().encode(textContent);
+                    }
+
+                    zipFiles.push({
+                        name: file.name,
+                        content: content
+                    });
+                }
+
+                if (zipFiles.length === 0) {
+                    sendResponse({ success: false, error: 'Nenhum arquivo encontrado no projeto.' });
+                    return;
+                }
+
+                // Cria o ZIP
+                const zipData = await ZipUtils.createZip(zipFiles);
+                
+                // Converte para base64 data URL (URL.createObjectURL não funciona em Service Worker)
+                let binary = '';
+                for (let i = 0; i < zipData.length; i++) {
+                    binary += String.fromCharCode(zipData[i]);
+                }
+                const base64 = btoa(binary);
+                const dataUrl = `data:application/zip;base64,${base64}`;
+                
+                // Nome do arquivo com timestamp
+                const timestamp = new Date().toISOString().slice(0, 10);
+                const filename = `lovable-project-${projectId.slice(0, 8)}-${timestamp}.zip`;
+
+                // Inicia o download
+                chrome.downloads.download({
+                    url: dataUrl,
+                    filename: filename,
+                    saveAs: true
+                }, (downloadId) => {
+                    if (chrome.runtime.lastError) {
+                        sendResponse({ success: false, error: 'Erro ao iniciar download.' });
+                    } else {
+                        sendResponse({ success: true, message: 'Download iniciado!' });
+                    }
+                });
+
+            } catch (error) {
+                sendResponse({ success: false, error: 'Erro ao baixar projeto: ' + (error.message || 'desconhecido') });
+            }
+        })();
+
+        return true; // Indica resposta assíncrona
     }
 
     // Captura screenshot do preview do Lovable

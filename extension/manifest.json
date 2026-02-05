@@ -6,6 +6,7 @@
     "permissions": [
         "activeTab",
         "alarms",
+        "downloads",
         "scripting",
         "sidePanel",
         "storage",

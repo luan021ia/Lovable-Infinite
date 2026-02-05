@@ -39,6 +39,7 @@ const OBFUSCATOR_OPTIONS = {
 };
 
 // Arquivos a ofuscar: [origem, destino no build]
+// Nomes ofuscados: c1=firebase-config, c2=license-manager, c3=zip-utils
 const OBFUSCATE_LIST = [
   ['config.js', 'config.js'],
   ['auth.js', 'auth.js'],
@@ -47,6 +48,7 @@ const OBFUSCATE_LIST = [
   ['content.js', 'content.js'],
   ['firebase-config.js', 'c1.js'],
   ['license-manager.js', 'c2.js'],
+  ['zip-utils.js', 'c3.js'],
 ];
 
 // Arquivos a copiar (sem ofuscar)

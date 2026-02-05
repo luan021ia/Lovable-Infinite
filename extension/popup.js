@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const licenseDaysEl = document.getElementById('license-days');
     const filePreviewContainer = document.getElementById('file-preview-container');
     const screenshotBtn = document.getElementById('screenshot-btn');
+    const downloadProjectBtn = document.getElementById('download-project-btn');
 
     // Storage key for chat per project
     const CHAT_STORAGE_KEY = 'lovable_infinity_chat';
@@ -554,6 +555,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // Download do projeto (beta) – por enquanto apenas esqueleto
+    async function downloadProject() {
+        // Garante que estamos em um projeto do Lovable e com token
+        await captureData();
+        if (!config.projectId) {
+            addSystemMessage('Abra um projeto no Lovable para baixar o código.');
+            return;
+        }
+        if (!config.token) {
+            addSystemMessage('Token do Lovable não encontrado. Recarregue a página do projeto.');
+            return;
+        }
+
+        if (!downloadProjectBtn) return;
+        downloadProjectBtn.disabled = true;
+        downloadProjectBtn.classList.add('loading');
+
+        try {
+            const response = await new Promise((resolve) => {
+                chrome.runtime.sendMessage({
+                    action: "downloadProject",
+                    projectId: config.projectId,
+                    token: config.token
+                }, resolve);
+            });
+
+            if (response && response.success) {
+                addSystemMessage(response.message || 'Download do projeto iniciado!');
+            } else {
+                addSystemMessage(response?.error || 'Erro ao baixar projeto.');
+            }
+        } catch (e) {
+            addSystemMessage('Erro ao iniciar download do projeto: ' + (e.message || 'desconhecido'));
+        } finally {
+            downloadProjectBtn.disabled = false;
+            downloadProjectBtn.classList.remove('loading');
+        }
+    }
+
     // Melhorar prompt: stream da API, texto aparece no input em tempo real
     if (improvePromptBtn) {
         improvePromptBtn.addEventListener('click', async () => {
@@ -659,6 +699,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Event Listeners
     sendBtn.addEventListener('click', sendMessage);
+    if (downloadProjectBtn) {
+        downloadProjectBtn.addEventListener('click', downloadProject);
+    }
 
     messageInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
