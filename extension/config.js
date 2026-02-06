@@ -2,7 +2,7 @@
  * Configurações da Extensão Lovable Infinity
  * Sistema de Licenças Vinculadas ao Dispositivo (Device Fingerprint)
  */
-(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
+// Console mantido (ofuscação da build já protege o código)
 
 const CONFIG = {
     REQUIRE_LICENSE: true,

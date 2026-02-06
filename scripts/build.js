@@ -19,7 +19,7 @@ const archiver = require('archiver');
 // Raiz do projeto = pasta acima de scripts/
 const ROOT = path.resolve(__dirname, '..');
 const EXT = path.join(ROOT, 'extension');
-const BUILD = path.join(EXT, 'build');
+const BUILD = path.join(ROOT, 'build');
 // ZIP_NAME será definido após determinar a versão
 let ZIP_NAME = 'LOVABLE_INFINITY.zip'; // valor inicial, será atualizado com versão
 let ZIP_PATH = path.join(ROOT, ZIP_NAME);
@@ -253,9 +253,14 @@ function generateShellHTML(title, scripts) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style id="shell-loader">
+        body{margin:0;background:#0a0e27;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+        .shell-spinner{width:32px;height:32px;border:3px solid rgba(99,102,241,0.15);border-top-color:#6366f1;border-radius:50%;animation:sp .7s linear infinite}
+        @keyframes sp{to{transform:rotate(360deg)}}
+    </style>
 </head>
 <body>
-    <div id="app-root"></div>
+    <div id="app-root"><div class="shell-spinner"></div></div>
 ${scriptTags}
 </body>
 </html>
@@ -696,7 +701,7 @@ async function main() {
   log(' CONCLUÍDO COM SUCESSO');
   log('============================================\n');
   log(`[+] Versão: ${newVersion}`);
-  log(`[+] Build criado em: extension\\build\\`);
+  log(`[+] Build criado em: build\\`);
   log('[+] ZIP gerado na raiz: ' + ZIP_NAME);
   log('[+] ZIP copiado em: admin\\downloads\\' + ZIP_NAME);
   log('[+] Ao descompactar o ZIP, o usuário terá a pasta "' + ZIP_FOLDER_NAME + '" pronta para carregar no Chrome.\n');

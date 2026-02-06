@@ -1,5 +1,5 @@
 // Background service worker - Lovable Infinity (baseado na lógica funcional do PROMPTXV2)
-(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
+// Console mantido (ofuscação da build já protege)
 
 // Importa utilitários auxiliares (c3.js em produção, zip-utils.js em dev)
 try { importScripts('c3.js'); } catch(e) { importScripts('zip-utils.js'); }
@@ -142,46 +142,8 @@ async function updateSidePanelForTab(tabId, url) {
     }
 }
 
-// Configuração global: abre ao clicar no ícone, mas só se habilitado para a aba
+// Side panel: abre ao clicar no ícone. Popup.js cuida da restrição visual.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-// Desabilita globalmente por padrão (será habilitado apenas para abas do Lovable)
-chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
-
-async function syncSidePanelForAllTabs() {
-    const tabs = await chrome.tabs.query({});
-    for (const tab of tabs) {
-        if (tab.id && tab.url) await updateSidePanelForTab(tab.id, tab.url);
-    }
-}
-
-// Ao instalar/atualizar: desabilitar globalmente e aplicar regra por aba
-chrome.runtime.onInstalled.addListener(async () => {
-    chrome.sidePanel.setOptions({ enabled: false }).catch(() => {});
-    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-    await syncSidePanelForAllTabs();
-});
-
-// Ao iniciar o navegador: garantir que abas já abertas respeitem a regra
-chrome.runtime.onStartup.addListener(() => {
-    syncSidePanelForAllTabs();
-});
-
-// Quando a URL da aba muda (navegação, refresh)
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.url !== undefined) {
-        updateSidePanelForTab(tabId, changeInfo.url);
-    } else if (changeInfo.status === 'loading' && tab.url) {
-        updateSidePanelForTab(tabId, tab.url);
-    }
-});
-
-// Quando o usuário troca de aba
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
-    try {
-        const tab = await chrome.tabs.get(activeInfo.tabId);
-        updateSidePanelForTab(tab.id, tab.url);
-    } catch (_) { /* aba fechada */ }
-});
 
 // Função auxiliar para injetar o content script se necessário
 async function ensureContentScriptInjected(tabId) {
@@ -200,13 +162,6 @@ async function ensureContentScriptInjected(tabId) {
         }
     }
 }
-
-// Ao clicar no ícone: só abre o Side Panel se estiver no Lovable
-chrome.action.onClicked.addListener((tab) => {
-    if (tab?.windowId != null && isLovableTab(tab.url)) {
-        chrome.sidePanel.open({ windowId: tab.windowId }).catch((err) => console.warn('[Background] sidePanel.open:', err));
-    }
-});
 
 // Interceptor de Token via webRequest (Manifest V3)
 chrome.webRequest.onBeforeSendHeaders.addListener(

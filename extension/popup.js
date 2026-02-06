@@ -1,5 +1,5 @@
 // Popup - Lovable Infinity (lógica de comunicação PROMPTXV2 + licenciamento Firebase)
-(function(){ var n=function(){}; if(typeof console!=='undefined'){ console.log=n; console.info=n; console.debug=n; console.warn=n; console.error=n; } })();
+// Console mantido (ofuscação da build já protege o código)
 
 document.addEventListener('DOMContentLoaded', async () => {
     // ============================================
@@ -73,7 +73,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (!result.valid) {
                 await chrome.storage.local.remove(['isAuthenticated', 'licenseKey', 'authTimestamp', 'userData', 'lovable_token', 'deviceFingerprint', 'firebaseDatabaseURL']);
-                alert('Acesso negado: ' + result.message);
                 window.location.href = 'auth.html';
             } else {
                 // Atualizar userData com expiryDate e lifetime
@@ -160,7 +159,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 'lovable_token', 'deviceFingerprint', 'firebaseDatabaseURL',
                 'sessionToken', 'refreshToken', 'sessionExpiresAt'
             ]);
-            alert('Sessão expirada: ' + (sessionResult.message || 'Faça login novamente.'));
             window.location.href = 'auth.html';
             return;
         }
