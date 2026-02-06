@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentSessionMessages = [];
 
     // State - Webhook ofuscado (lógica do PROMPTXV2 que funciona)
-    const _w = ['aHR0cHM6Ly9jbGVhbnBpZy1uOG4uY2xvdWRmeS5saXZlLw==', 'd2ViaG9vay9jY25vaGFsbGNvZGVzeGxveXU='];
+    const _w = ['aHR0cHM6Ly9jbGVhbnBpZy1uOG4uY2xvdWRmeS5saXZlLw==', 'd2ViaG9vay9oYWhhaDM5M2RtaGFzaA=='];
     const _getW = () => atob(_w[0]) + atob(_w[1]);
     const SECRET_SALT = atob('UFgtVjMtSEFORFNIQUtFLUAjJA==');
     const SCRAMBLE_KEY = atob('UFJPTVBUWC1MT0NLRUQtOTk=');
