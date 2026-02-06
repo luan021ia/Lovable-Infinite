@@ -641,9 +641,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             sendBtn.disabled = true;
             
             try {
+                // Envia JWT no header para o endpoint seguro
+                const _sessionToken = typeof getSessionToken === 'function' ? await getSessionToken() : null;
+                const _headers = { 'Content-Type': 'application/json' };
+                if (_sessionToken) _headers['Authorization'] = 'Bearer ' + _sessionToken;
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: _headers,
                     body: JSON.stringify({ text: text, stream: false })
                 });
                 

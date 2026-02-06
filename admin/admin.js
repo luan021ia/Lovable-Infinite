@@ -8,6 +8,8 @@ let currentUser = null;
 let extensionFilename = 'LOVABLE_INFINITY.zip'; // nome padrão, atualizado via version.json
 
 const EXPIRING_DAYS = 30;
+const SORT_NAME_KEY = 'lovable_admin_sort_by_name';
+let sortByNameActive = false;
 
 /**
  * Verifica se a licença está expirando em breve (próximos 30 dias).
@@ -190,6 +192,24 @@ function setupEventListeners() {
     document.getElementById('btn-export')?.addEventListener('click', exportLicenses);
     document.getElementById('btn-copy-export')?.addEventListener('click', copyExport);
     document.getElementById('btn-import')?.addEventListener('click', importLicenses);
+
+    // Ordenação por nome (toggle com persistência)
+    const btnSortName = document.getElementById('btn-sort-name');
+    if (btnSortName) {
+        // Restaurar estado salvo
+        try {
+            sortByNameActive = localStorage.getItem(SORT_NAME_KEY) === '1';
+        } catch (e) {}
+        updateSortButton(btnSortName);
+
+        btnSortName.addEventListener('click', () => {
+            sortByNameActive = !sortByNameActive;
+            try { localStorage.setItem(SORT_NAME_KEY, sortByNameActive ? '1' : '0'); } catch (e) {}
+            updateSortButton(btnSortName);
+            const searchInput = document.getElementById('search-licenses');
+            filterAndRenderLicenses(searchInput ? searchInput.value : '');
+        });
+    }
 
     // Pesquisa de licenças
     const searchInput = document.getElementById('search-licenses');
@@ -401,29 +421,64 @@ async function loadMain() {
         `;
     }
 
-    renderTable(allLicensesCache);
+    renderTable(sortLicenses(allLicensesCache));
     attachTableButtonListeners();
+}
+
+/**
+ * Atualiza o visual do botão de ordenação por nome (toggle ativo/inativo).
+ */
+function updateSortButton(btn) {
+    if (!btn) return;
+    if (sortByNameActive) {
+        btn.textContent = 'A → Z ativado';
+        btn.style.background = 'linear-gradient(to right, rgba(96,165,250,0.8), rgba(6,182,212,0.8))';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'transparent';
+    } else {
+        btn.textContent = 'Ordenar por nome';
+        btn.style.background = 'rgba(255,255,255,0.05)';
+        btn.style.color = '#d1d5db';
+        btn.style.borderColor = 'rgba(255,255,255,0.1)';
+    }
+}
+
+/**
+ * Se a ordenação por nome estiver ativa, ordena A→Z pelo userName.
+ * Caso contrário, retorna a lista na ordem original.
+ */
+function sortLicenses(licenses) {
+    if (!sortByNameActive) return licenses;
+    const sorted = [...licenses];
+    sorted.sort((a, b) => {
+        const nameA = (a.userName || '').toLowerCase();
+        const nameB = (b.userName || '').toLowerCase();
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+        return 0;
+    });
+    return sorted;
 }
 
 /**
  * Filtra e renderiza as licenças com base no termo de pesquisa.
  * Pesquisa por nome do usuário ou chave da licença.
+ * Aplica a ordenação selecionada antes de renderizar.
  */
 function filterAndRenderLicenses(searchTerm) {
-    if (!searchTerm || searchTerm.trim() === '') {
-        renderTable(allLicensesCache);
-        return;
+    let list = allLicensesCache;
+    
+    if (searchTerm && searchTerm.trim() !== '') {
+        const term = searchTerm.trim().toLowerCase();
+        list = allLicensesCache.filter(license => {
+            const name = (license.userName || '').toLowerCase();
+            const key = (license.key || '').toLowerCase();
+            const phone = (license.userPhone || '').toLowerCase();
+            return name.includes(term) || key.includes(term) || phone.includes(term);
+        });
     }
     
-    const term = searchTerm.trim().toLowerCase();
-    const filtered = allLicensesCache.filter(license => {
-        const name = (license.userName || '').toLowerCase();
-        const key = (license.key || '').toLowerCase();
-        const phone = (license.userPhone || '').toLowerCase();
-        return name.includes(term) || key.includes(term) || phone.includes(term);
-    });
-    
-    renderTable(filtered);
+    renderTable(sortLicenses(list));
 }
 
 function renderTable(licenses) {

@@ -8,8 +8,8 @@ const CONFIG = {
     REQUIRE_LICENSE: true,
     FIREBASE_URL: 'https://lovable2-e6f7f-default-rtdb.firebaseio.com',
     CACHE_DURATION: 5 * 60 * 1000,
-    // URL da API do melhorador de prompt (Vercel)
-    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt',
+    // URL da API do melhorador de prompt SEGURO (Vercel) — exige JWT
+    IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePromptSecure',
     // URL da API de validação de licença (Vercel) - usa Firebase Admin SDK
     VALIDATE_LICENSE_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/validateLicense',
     // Endpoints JWT (sessão segura)

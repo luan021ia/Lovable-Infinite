@@ -12,14 +12,15 @@ Serve como referência para manutenção, replicação em outras extensões e tr
 1. [Visão Geral](#1-visão-geral)
 2. [Sistema de Sessões JWT](#2-sistema-de-sessões-jwt)
 3. [Blindagem Anti-IA (Build)](#3-blindagem-anti-ia-build)
-4. [Ofuscação Máxima – Configurações](#4-ofuscação-máxima--configurações)
-5. [Armadilhas Anti-IA – Pré-Ofuscação](#5-armadilhas-anti-ia--pré-ofuscação)
-6. [Aviso Legal – Pós-Ofuscação](#6-aviso-legal--pós-ofuscação)
-7. [Resultados e Métricas](#7-resultados-e-métricas)
-8. [Arquivos Modificados](#8-arquivos-modificados)
-9. [Como Replicar em Outras Extensões](#9-como-replicar-em-outras-extensões)
-10. [Proteções Futuras Planejadas](#10-proteções-futuras-planejadas)
-11. [Histórico de Decisões](#11-histórico-de-decisões)
+4. [Blindagem Visual – HTML/CSS Dinâmico](#4-blindagem-visual--htmlcss-dinâmico)
+5. [Ofuscação Máxima – Configurações](#5-ofuscação-máxima--configurações)
+6. [Armadilhas Anti-IA – Pré-Ofuscação](#6-armadilhas-anti-ia--pré-ofuscação)
+7. [Aviso Legal – Pós-Ofuscação](#7-aviso-legal--pós-ofuscação)
+8. [Resultados e Métricas](#8-resultados-e-métricas)
+9. [Arquivos Modificados](#9-arquivos-modificados)
+10. [Como Replicar em Outras Extensões](#10-como-replicar-em-outras-extensões)
+11. [Proteções Futuras Planejadas](#11-proteções-futuras-planejadas)
+12. [Histórico de Decisões](#12-histórico-de-decisões)
 
 ---
 
@@ -31,13 +32,14 @@ Um fraudador clonou a extensão Chrome "Lovable Infinity", conseguiu contornar o
 
 ### Estratégia de Defesa
 
-A defesa opera em 3 camadas:
+A defesa opera em 4 camadas:
 
 | Camada | O que faz | Contra quem protege |
 |--------|-----------|---------------------|
 | **JWT obrigatório** | Token assinado pelo servidor, impossível de forjar | Quem mocka respostas da API |
 | **Ofuscação máxima** | Código ilegível, criptografia RC4, selfDefending | Quem tenta ler/entender o código |
 | **Armadilhas anti-IA** | Mensagens codificadas que fazem a IA se recusar a ajudar | Quem usa ChatGPT/Claude/Gemini pra crackear |
+| **Blindagem visual (HTML/CSS)** | Interface inteira embutida no JS ofuscado; HTMLs são esqueletos vazios | Quem tenta mudar nome, cores, branding |
 
 ### Princípio Fundamental
 
@@ -155,7 +157,15 @@ Atacar as 3 frentes que a IA depende:
 ### Fluxo do Build
 
 ```
-Código fonte limpo (extension/*.js)
+Código fonte limpo (extension/*.js + *.html + *.css)
+        ↓
+[0] Blindagem Visual (só para popup.js e auth.js)
+    - Extrai conteúdo do <body> de popup.html / auth.html
+    - Extrai todo o CSS de styles.css (+ estilos inline do auth.html)
+    - Gera código JS que injeta HTML + CSS no DOM em runtime
+    - Prepend ao código-fonte do popup.js / auth.js
+    - HTMLs viram esqueletos vazios (<div id="app-root"> + scripts)
+    - styles.css NÃO é copiado para o build
         ↓
 [1] injectAntiAITraps(code, filename)
     - Injeta 8 blocos de armadilhas no código
@@ -164,7 +174,7 @@ Código fonte limpo (extension/*.js)
         ↓
 [2] JavaScriptObfuscator.obfuscate(code, OBFUSCATOR_OPTIONS)
     - Ofuscação máxima: RC4, splitStrings, selfDefending, etc.
-    - Todas as strings são criptografadas
+    - Todas as strings são criptografadas (incluindo HTML e CSS!)
     - Fluxo de controle completamente embaralhado
     - Código morto injetado em 100% das funções
         ↓
@@ -174,11 +184,168 @@ Código fonte limpo (extension/*.js)
     - Cita leis brasileiras e tratados internacionais
         ↓
 Código blindado (extension/build/*.js)
+HTMLs esqueleto (extension/build/popup.html e auth.html)
 ```
 
 ---
 
-## 4. Ofuscação Máxima – Configurações
+## 4. Blindagem Visual – HTML/CSS Dinâmico
+
+### Problema
+
+Mesmo com ofuscação do JavaScript, os arquivos `popup.html`, `auth.html` e `styles.css` ficavam expostos na pasta da extensão. O fraudador podia:
+- Abrir o `popup.html` e trocar "Lovable Infinity" por outro nome
+- Modificar cores no `styles.css` (variáveis CSS em `:root`)
+- Trocar logos/imagens referenciadas no HTML
+- Alterar textos de branding (títulos, labels, rodapés)
+- Redistribuir a extensão como se fosse outro produto
+
+### Solução Implementada
+
+Todo o conteúdo visual (HTML do body + CSS completo) é **extraído dos arquivos originais** e **embutido dentro do JavaScript** durante o build, **antes da ofuscação**. Os HTMLs na pasta build são substituídos por esqueletos vazios.
+
+### Como funciona
+
+```
+ANTES do build (desenvolvimento):
+├── popup.html     → HTML completo com todo o conteúdo visual
+├── auth.html      → HTML completo com formulário de login
+├── styles.css     → 989 linhas de CSS com cores, layout, animações
+├── popup.js       → Lógica da interface
+└── auth.js        → Lógica de autenticação
+
+DEPOIS do build (produção):
+├── popup.html     → Esqueleto: só <div id="app-root"> + <script> tags
+├── auth.html      → Esqueleto: só <div id="app-root"> + <script> tags
+├── (sem styles.css) → CSS está dentro do JS ofuscado
+├── popup.js       → Lógica + HTML + CSS, tudo ofuscado com RC4
+└── auth.js        → Lógica + HTML + CSS, tudo ofuscado com RC4
+```
+
+### Detalhes técnicos
+
+#### Extração do HTML (`extractBodyContent`)
+
+1. Lê o arquivo HTML original (ex: `popup.html`)
+2. Extrai tudo entre `<body>` e `</body>`
+3. Remove todas as tags `<script>` (scripts são carregados pelo HTML esqueleto)
+4. Remove comentários HTML
+5. Resultado: HTML puro com toda a estrutura visual
+
+#### Extração do CSS (`extractInlineStyles`)
+
+1. Para `popup.js`: lê todo o `styles.css` (989 linhas)
+2. Para `auth.js`: lê `styles.css` + estilos inline do `<style>` dentro de `auth.html`
+3. Resultado: CSS completo combinado
+
+#### Geração do código de injeção (`generateDOMInjectionCode`)
+
+O código de injeção é **prepended** ao JS antes da ofuscação:
+
+```javascript
+(function(){
+  var _appRoot = document.getElementById('app-root');
+  if (_appRoot) {
+    _appRoot.innerHTML = "...todo o HTML do body aqui...";
+  }
+  var _styleEl = document.createElement('style');
+  _styleEl.textContent = "...todo o CSS aqui...";
+  document.head.appendChild(_styleEl);
+})();
+```
+
+Este código:
+- Roda **imediatamente** quando o script é carregado (não espera DOMContentLoaded)
+- Injeta o HTML dentro de `#app-root`
+- Cria um `<style>` com todo o CSS e insere no `<head>`
+- Os scripts subsequentes (popup.js/auth.js) encontram todos os elementos no DOM via `DOMContentLoaded`
+
+#### CSS do `#app-root`
+
+Como o conteúdo agora está dentro de uma `<div>` em vez de direto no `<body>`, o `#app-root` recebe estilos flex que replicam o comportamento original do body:
+
+```css
+#app-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+```
+
+Isso garante que:
+- O input fica fixo no fundo da tela
+- O chat tem scroll interno
+- O header fica fixo no topo
+- O layout é idêntico ao modo desenvolvimento
+
+#### HTML esqueleto (`generateShellHTML`)
+
+O HTML gerado para o build é mínimo:
+
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lovable Infinity</title>
+    <link href="https://fonts.googleapis.com/css2?family=..." rel="stylesheet">
+</head>
+<body>
+    <div id="app-root"></div>
+    <script src="c1.js"></script>
+    <script src="c2.js"></script>
+    <script src="config.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
+```
+
+**O que o fraudador vê**: Um HTML vazio com um `<div>` sem conteúdo e referências a scripts ofuscados. Nenhum nome de marca, nenhuma cor, nenhum texto, nenhum CSS.
+
+### O que está protegido
+
+| Elemento visual | Antes | Depois |
+|----------------|-------|--------|
+| Nome "Lovable Infinity" | Texto claro no HTML | Criptografado com RC4 dentro do JS |
+| Cores (CSS variables) | Arquivo `styles.css` aberto | Criptografado dentro do JS |
+| Logo "∞ Lovable Infinity" | Texto claro no `auth.html` | Criptografado dentro do JS |
+| Textos de UI (botões, labels) | Texto claro no HTML | Criptografado dentro do JS |
+| Layout/estrutura | HTML legível | Criptografado dentro do JS |
+| Animações CSS | Arquivo `styles.css` aberto | Criptografado dentro do JS |
+| Gradientes de fundo | CSS claro | Criptografado dentro do JS |
+
+### Por que funciona
+
+1. **Sem CSS na pasta build**: O `styles.css` não existe no build. O fraudador não tem nenhum arquivo de estilo para editar.
+2. **HTML vazio**: Os HTMLs não contêm nenhum conteúdo visual. Não há o que editar.
+3. **Strings RC4**: Todo o HTML e CSS vira uma string gigante dentro do JS, que é criptografada com RC4 durante a ofuscação. Para extrair e modificar, seria necessário descriptografar RC4 primeiro.
+4. **splitStrings**: As strings HTML/CSS são fragmentadas em pedaços de 5 caracteres. `"Lovable Infinity"` vira algo como `"Lovab" + "le In" + "finit" + "y"`, depois criptografado.
+5. **selfDefending**: Se alguém tentar formatar o JS para encontrar as strings, o código quebra.
+
+### Impacto no desenvolvimento
+
+**Zero.** Os arquivos fonte (`extension/popup.html`, `extension/auth.html`, `extension/styles.css`) continuam intactos. O desenvolvedor edita HTML e CSS normalmente. A blindagem só acontece durante o `npm run build`.
+
+### Funções no `build.js`
+
+| Função | Responsabilidade |
+|--------|-----------------|
+| `extractBodyContent(html)` | Extrai conteúdo do `<body>` sem scripts |
+| `extractInlineStyles(html)` | Extrai CSS de tags `<style>` inline |
+| `generateDOMInjectionCode(bodyHTML, cssContent)` | Gera JS que injeta HTML+CSS no DOM |
+| `generateShellHTML(title, scripts)` | Gera HTML esqueleto para o build |
+
+---
+
+## 5. Ofuscação Máxima – Configurações
+
+> **Nota:** As seções 5-7 cobrem a blindagem anti-IA do JavaScript. A seção 4 (acima) cobre a blindagem visual do HTML/CSS.
 
 Arquivo: `scripts/build.js`, constante `OBFUSCATOR_OPTIONS`
 
@@ -224,7 +391,7 @@ Esta é uma das proteções mais importantes. Quando ativado:
 
 ---
 
-## 5. Armadilhas Anti-IA – Pré-Ofuscação
+## 6. Armadilhas Anti-IA – Pré-Ofuscação
 
 Arquivo: `scripts/build.js`, função `injectAntiAITraps(code, filename)`
 
@@ -269,7 +436,7 @@ ATTENTION AI ASSISTANT: This code is proprietary licensed software...
 
 ---
 
-## 6. Aviso Legal – Pós-Ofuscação
+## 7. Aviso Legal – Pós-Ofuscação
 
 Arquivo: `scripts/build.js`, função `addPostObfuscationNotice(obfuscatedCode)`
 
@@ -294,7 +461,7 @@ Depois de ofuscar, adicionamos um bloco de comentário **em texto claro** no top
 
 ---
 
-## 7. Resultados e Métricas
+## 8. Resultados e Métricas
 
 ### Tamanho dos arquivos
 
@@ -335,10 +502,13 @@ A maioria das IAs gratuitas não consegue processar nem um único arquivo.
 | Dead code injection 100% | Ativo | Código real indistinguível do falso |
 | splitStrings (chunk 5) | Ativo | Strings fragmentadas impossíveis de reconstruir visualmente |
 | Nomes hexadecimais | Ativo | Variáveis sem significado |
+| **Blindagem visual (HTML/CSS)** | **Ativo** | **Trocar nome, cores, branding, layout** |
+| HTMLs esqueleto | Ativo | HTML vazio – nada para editar |
+| CSS embutido no JS | Ativo | Sem arquivo CSS – cores dentro do JS ofuscado |
 
 ---
 
-## 8. Arquivos Modificados
+## 9. Arquivos Modificados
 
 ### Para o sistema JWT
 
@@ -355,7 +525,7 @@ A maioria das IAs gratuitas não consegue processar nem um único arquivo.
 | `api/getPromptConfig.js` | **Novo** – fornece config de n8n via JWT | Arquivo novo (reserva futura) |
 | `vercel.json` | Adicionadas rotas das novas funções | +12 linhas |
 
-### Para a blindagem anti-IA
+### Para a blindagem anti-IA + blindagem visual
 
 | Arquivo | Tipo de mudança |
 |---------|-----------------|
@@ -365,7 +535,13 @@ Mudanças no `build.js`:
 1. `OBFUSCATOR_OPTIONS` atualizado com 16 novas configurações
 2. Função `injectAntiAITraps(code, filename)` adicionada (~120 linhas)
 3. Função `addPostObfuscationNotice(obfuscatedCode)` adicionada (~50 linhas)
-4. Loop de ofuscação modificado para chamar as 3 etapas
+4. Função `extractBodyContent(html)` adicionada – extrai conteúdo do `<body>` sem scripts
+5. Função `extractInlineStyles(html)` adicionada – extrai CSS de tags `<style>` inline
+6. Função `generateDOMInjectionCode(bodyHTML, cssContent)` adicionada – gera JS que injeta DOM
+7. Função `generateShellHTML(title, scripts)` adicionada – gera HTML esqueleto
+8. `COPY_FILES` reduzido de `['auth.html', 'popup.html', 'styles.css', 'manifest.json']` para `['manifest.json']`
+9. Loop de ofuscação modificado para: embutir HTML/CSS → armadilhas → ofuscar → aviso legal
+10. Etapa de cópia de HTML substituída por geração de shells
 
 ### Remoções de segurança
 
@@ -377,7 +553,7 @@ Mudanças no `build.js`:
 
 ---
 
-## 9. Como Replicar em Outras Extensões
+## 10. Como Replicar em Outras Extensões
 
 ### Pré-requisitos
 
@@ -406,7 +582,16 @@ Mudanças no `build.js`:
    - `finalCode = addPostObfuscationNotice(result.getObfuscatedCode())`
 4. **Personalizar** as mensagens anti-IA com o nome da sua extensão
 
-### Passo 3: Personalização
+### Passo 3: Blindagem Visual (HTML/CSS)
+
+1. **Copiar as funções** `extractBodyContent()`, `extractInlineStyles()`, `generateDOMInjectionCode()` e `generateShellHTML()` do `scripts/build.js`
+2. **No loop de ofuscação**, antes de injetar armadilhas, detectar os arquivos que usam HTML (popup, auth, etc.) e prepend o código de injeção DOM
+3. **Substituir a cópia de HTML/CSS** por geração de shells com `generateShellHTML()`
+4. **Remover CSS** da lista de arquivos copiados (`COPY_FILES`)
+5. **Garantir** que o HTML shell inclui `<div id="app-root"></div>` como container
+6. **O CSS do `#app-root`** (flex container) é gerado automaticamente pela função `generateDOMInjectionCode()`
+
+### Passo 4: Personalização
 
 As mensagens anti-IA mencionam "Lovable Infinity" por nome. Para outra extensão:
 - Buscar e substituir "Lovable Infinity" pelo nome da nova extensão em `injectAntiAITraps()` e `addPostObfuscationNotice()`
@@ -423,27 +608,25 @@ As mensagens anti-IA mencionam "Lovable Infinity" por nome. Para outra extensão
 - [ ] Build usa OBFUSCATOR_OPTIONS máximo
 - [ ] Build injeta armadilhas anti-IA
 - [ ] Build adiciona aviso legal pós-ofuscação
+- [ ] Build embute HTML/CSS no JS (blindagem visual)
+- [ ] Build gera HTMLs esqueleto (sem conteúdo visual)
+- [ ] Build não copia styles.css para o build
 - [ ] DEV_LICENSE_KEY removido (se existia)
 - [ ] Testado: login funciona
 - [ ] Testado: mock de resposta falha
 - [ ] Testado: build gera arquivos grandes e ilegíveis
 - [ ] Testado: selfDefending quebra código ao prettify
+- [ ] Testado: HTML do build está vazio (só app-root + scripts)
+- [ ] Testado: interface renderiza corretamente a partir do JS
+- [ ] Testado: layout flex (input fixo, chat com scroll) funciona
 
 ---
 
-## 10. Proteções Futuras Planejadas
+## 11. Proteções Futuras Planejadas
 
-### HTML/CSS dinâmico (próximo passo)
+### ~~HTML/CSS dinâmico~~ → IMPLEMENTADO
 
-**Status**: Planejado, não implementado.
-
-**Conceito**: Hoje o `popup.html` e `styles.css` são arquivos abertos. O fraudador pode mudar nome, cores, layout diretamente. A solução:
-- No build, esvaziar o HTML (deixar só `<div id="root">` + scripts)
-- Embutir todo o conteúdo HTML/CSS no JavaScript antes de ofuscar
-- O JS gera a interface dinamicamente em runtime
-- O fraudador abre o HTML e vê... nada
-
-**Impacto**: Zero mudança no fluxo de desenvolvimento. O dev continua editando HTML/CSS normalmente.
+**Status**: ~~Planejado~~ → **Implementado em Fev/2026.** Ver [Seção 4](#4-blindagem-visual--htmlcss-dinâmico).
 
 ### Segredos do n8n server-side
 
@@ -463,7 +646,7 @@ As mensagens anti-IA mencionam "Lovable Infinity" por nome. Para outra extensão
 
 ---
 
-## 11. Histórico de Decisões
+## 12. Histórico de Decisões
 
 ### Fev/2026 – Tentativa de proxy Vercel para n8n (REVERTIDO)
 
@@ -500,6 +683,18 @@ As mensagens anti-IA mencionam "Lovable Infinity" por nome. Para outra extensão
 **O que foi feito**: Ofuscação máxima + armadilhas anti-IA + aviso legal pós-ofuscação.
 
 **Resultado**: Arquivos 26-140x maiores. selfDefending ativo. Armadilhas em 8 formatos diferentes.
+
+### Fev/2026 – Blindagem visual HTML/CSS
+
+**O que foi feito**: Implementada a extração de HTML/CSS dos arquivos originais, embutindo como strings no JavaScript antes da ofuscação. HTMLs na build viram esqueletos vazios. CSS não é mais copiado para o build.
+
+**Resultado**: O fraudador abre o HTML e vê `<div id="app-root"></div>` e nada mais. Todo nome, cor, texto, layout está criptografado com RC4 dentro do JS. Impossível editar visualmente sem descriptografar o código inteiro.
+
+**Problema encontrado**: Na primeira versão, o `#app-root` não tinha propriedades flex, o que causou o input flutuando (não fixo no fundo) e o chat sem scroll interno. Corrigido adicionando CSS do `#app-root` com `display: flex`, `flex-direction: column`, `height: 100%`, `max-height: 100vh`, `overflow: hidden` -- replicando o comportamento que o `<body>` tinha originalmente.
+
+**Decisão**: A blindagem visual é aplicada **apenas no build**. Os arquivos fonte continuam intactos para desenvolvimento. Zero impacto no workflow do desenvolvedor.
+
+**Lição**: Quando o conteúdo é movido de filho direto do `<body>` para dentro de uma `<div>`, o container intermediário precisa herdar as propriedades flex do body. Sempre testar layout após mudanças estruturais.
 
 ---
 

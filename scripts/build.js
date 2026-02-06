@@ -66,7 +66,9 @@ const OBFUSCATE_LIST = [
 ];
 
 // Arquivos a copiar (sem ofuscar)
-const COPY_FILES = ['auth.html', 'popup.html', 'styles.css', 'manifest.json'];
+// NOTA: popup.html, auth.html e styles.css NÃO são copiados.
+// O HTML/CSS é embutido no JavaScript durante o build (blindagem visual).
+const COPY_FILES = ['manifest.json'];
 
 function log(msg) {
   console.log(msg);
@@ -157,6 +159,107 @@ function incrementVersion(currentVersion, type) {
   }
 
   return `${major}.${minor}.${patch}`;
+}
+
+// ============================================
+// BLINDAGEM HTML/CSS → JAVASCRIPT
+// No build, o conteúdo HTML e CSS é extraído dos arquivos originais
+// e embutido no JavaScript ANTES da ofuscação. Os HTMLs viram
+// esqueletos vazios. O fraudador abre o HTML e vê... nada.
+// ============================================
+
+/**
+ * Extrai o conteúdo do <body> de um HTML, removendo tags <script>.
+ * @param {string} html - Conteúdo HTML completo
+ * @returns {string} Conteúdo do body sem scripts
+ */
+function extractBodyContent(html) {
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (!bodyMatch) return '';
+  let body = bodyMatch[1];
+  // Remover todas as tags <script>
+  body = body.replace(/<script[\s\S]*?<\/script>/gi, '');
+  // Remover comentários HTML
+  body = body.replace(/<!--[\s\S]*?-->/g, '');
+  // Trim
+  body = body.trim();
+  return body;
+}
+
+/**
+ * Extrai o conteúdo de tags <style> inline de um HTML.
+ * @param {string} html - Conteúdo HTML completo
+ * @returns {string} CSS encontrado em tags <style>
+ */
+function extractInlineStyles(html) {
+  const styles = [];
+  const regex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    styles.push(match[1].trim());
+  }
+  return styles.join('\n');
+}
+
+/**
+ * Gera código JavaScript que injeta HTML e CSS no DOM.
+ * Este código roda ANTES do DOMContentLoaded, inserindo todos os
+ * elementos no DOM para que os scripts originais encontrem tudo.
+ * @param {string} bodyHTML - Conteúdo HTML do body
+ * @param {string} cssContent - Conteúdo CSS completo
+ * @returns {string} Código JS de injeção
+ */
+function generateDOMInjectionCode(bodyHTML, cssContent) {
+  // CSS extra para #app-root herdar o layout flex do body.
+  // Sem isso, os elementos ficam sem altura fixa e o scroll/input quebram.
+  const appRootCSS = `
+#app-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: 100vh;
+  overflow: hidden;
+  position: relative;
+}`;
+  const fullCSS = appRootCSS + '\n' + cssContent;
+  // Usar JSON.stringify para escapar corretamente todas as aspas, newlines, etc.
+  const escapedHTML = JSON.stringify(bodyHTML);
+  const escapedCSS = JSON.stringify(fullCSS);
+  return `(function(){` +
+    `var _appRoot=document.getElementById('app-root');` +
+    `if(_appRoot){_appRoot.innerHTML=${escapedHTML};}` +
+    `var _styleEl=document.createElement('style');` +
+    `_styleEl.textContent=${escapedCSS};` +
+    `document.head.appendChild(_styleEl);` +
+    `})();\n`;
+}
+
+/**
+ * Gera o HTML esqueleto (shell) para o build.
+ * Contém apenas o container vazio + scripts. Todo o conteúdo visual
+ * é injetado pelo JavaScript ofuscado.
+ * @param {string} title - Título da página
+ * @param {string[]} scripts - Lista de scripts a incluir
+ * @returns {string} HTML mínimo
+ */
+function generateShellHTML(title, scripts) {
+  const scriptTags = scripts.map(s => `    <script src="${s}"></script>`).join('\n');
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app-root"></div>
+${scriptTags}
+</body>
+</html>
+`;
 }
 
 // ============================================
@@ -473,6 +576,27 @@ async function main() {
     log(`[${i + 1}/${OBFUSCATE_LIST.length}] Ofuscando ${srcName} ${destName !== srcName ? '-> ' + destName : ''}...`);
     try {
       let code = fs.readFileSync(srcPath, 'utf8');
+
+      // 0) Embutir HTML/CSS no JavaScript (só para popup.js e auth.js)
+      if (srcName === 'popup.js') {
+        const popupHTMLRaw = fs.readFileSync(path.join(EXT, 'popup.html'), 'utf8');
+        const cssRaw = fs.readFileSync(path.join(EXT, 'styles.css'), 'utf8');
+        const bodyHTML = extractBodyContent(popupHTMLRaw);
+        const injectionCode = generateDOMInjectionCode(bodyHTML, cssRaw);
+        code = injectionCode + code;
+        log('    [+] HTML/CSS do popup embutidos no JS');
+      }
+      if (srcName === 'auth.js') {
+        const authHTMLRaw = fs.readFileSync(path.join(EXT, 'auth.html'), 'utf8');
+        const cssRaw = fs.readFileSync(path.join(EXT, 'styles.css'), 'utf8');
+        const inlineCSS = extractInlineStyles(authHTMLRaw);
+        const bodyHTML = extractBodyContent(authHTMLRaw);
+        const fullCSS = cssRaw + '\n' + inlineCSS;
+        const injectionCode = generateDOMInjectionCode(bodyHTML, fullCSS);
+        code = injectionCode + code;
+        log('    [+] HTML/CSS do auth embutidos no JS');
+      }
+
       // 1) Injetar armadilhas anti-IA antes de ofuscar
       code = injectAntiAITraps(code, srcName);
       // 2) Ofuscar com configurações máximas
@@ -486,8 +610,8 @@ async function main() {
     }
   }
 
-  // 4) Copiar arquivos não-JS
-  log('\n[*] Copiando arquivos (HTML, CSS, manifest)...');
+  // 4) Copiar arquivos não-JS (manifest.json etc.)
+  log('\n[*] Copiando arquivos (manifest)...');
   COPY_FILES.forEach((name) => {
     const src = path.join(EXT, name);
     const dest = path.join(BUILD, name);
@@ -498,13 +622,19 @@ async function main() {
     copyFileSync(src, dest);
   });
 
-  // 5) Ajustar referências nos HTML (firebase-config.js -> c1.js, license-manager.js -> c2.js)
-  const replacements = [
-    ['firebase-config.js', 'c1.js'],
-    ['license-manager.js', 'c2.js'],
-  ];
-  replaceInFile(path.join(BUILD, 'popup.html'), replacements);
-  replaceInFile(path.join(BUILD, 'auth.html'), replacements);
+  // 5) Gerar HTMLs esqueleto (shell) — todo o conteúdo visual está no JS
+  log('\n[*] Gerando HTMLs esqueleto (conteúdo está no JS ofuscado)...');
+  const popupShell = generateShellHTML('Lovable Infinity', [
+    'c1.js', 'c2.js', 'config.js', 'popup.js'
+  ]);
+  fs.writeFileSync(path.join(BUILD, 'popup.html'), popupShell, 'utf8');
+  log('    popup.html → shell gerado');
+
+  const authShell = generateShellHTML('Autenticação - Lovable Infinity', [
+    'c1.js', 'c2.js', 'config.js', 'auth.js'
+  ]);
+  fs.writeFileSync(path.join(BUILD, 'auth.html'), authShell, 'utf8');
+  log('    auth.html → shell gerado');
 
   // 6) Copiar ícones
   log('[*] Copiando ícones...');
