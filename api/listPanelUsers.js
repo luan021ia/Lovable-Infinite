@@ -4,7 +4,7 @@
  * Header: Authorization: Bearer <Firebase ID Token>
  */
 
-const { getAdminAuth, verifyMasterToken, listPanelUsersFromDb } = require('./lib/firebaseAdmin');
+const { getAdminAuth, verifyMasterToken, listPanelUsersFromDb } = require('./_lib/firebaseAdmin');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

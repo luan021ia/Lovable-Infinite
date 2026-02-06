@@ -111,14 +111,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (result.license.lifetime === true) userData.lifetime = true;
             }
 
-            await chrome.storage.local.set({
+            const storageData = {
                 licenseKey: key,
                 isAuthenticated: true,
                 authTimestamp: new Date().toISOString(),
                 userData,
                 deviceFingerprint: deviceFingerprint,
                 firebaseDatabaseURL: firebaseDatabaseURL
-            });
+            };
+
+            // Salvar JWT tokens se o servidor retornou (sessão segura)
+            if (result.sessionToken) storageData.sessionToken = result.sessionToken;
+            if (result.refreshToken) storageData.refreshToken = result.refreshToken;
+            if (result.sessionExpiresAt) storageData.sessionExpiresAt = result.sessionExpiresAt;
+
+            await chrome.storage.local.set(storageData);
 
             // Redirecionar para a página principal após 1 segundo
             setTimeout(() => {

@@ -1,23 +1,26 @@
 /**
  * POST /api/validateLicense
  * Valida e ativa/atualiza sessão da licença via Firebase Admin SDK.
+ * AGORA retorna um JWT de sessão que a extensão DEVE usar em todas as requisições.
+ * 
  * Body: { licenseKey, deviceFingerprint }
+ * Retorna: { valid, message, sessionToken?, refreshToken?, expiresAt?, license?, userData? }
  */
 
-const { getDatabase, getLicense, updateLicense } = require('./lib/firebaseAdmin');
+const { getDatabase, getLicense, updateLicense } = require('./_lib/firebaseAdmin');
+const { createSession } = require('./_lib/sessionManager');
 
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 
 // ========== MODO DE EMERGÊNCIA ==========
 // Bloqueia TODAS as licenças exceto a de manutenção
-// Desativado - webhook atualizado para o novo endpoint seguro
 const EMERGENCY_MODE = false;
 const MAINTENANCE_LICENSE_KEY = 'MLI-MANUTENCAO-2026-EMERGENCIA';
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 function parseBody(req) {
@@ -25,11 +28,7 @@ function parseBody(req) {
   if (raw == null) return {};
   if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
   if (typeof raw === 'string') {
-    try {
-      return JSON.parse(raw);
-    } catch (_) {
-      return {};
-    }
+    try { return JSON.parse(raw); } catch (_) { return {}; }
   }
   return {};
 }
@@ -55,12 +54,15 @@ module.exports = async function handler(req, res) {
   }
 
   // ========== MODO DE EMERGÊNCIA ==========
-  // Bloqueia TODAS as licenças exceto a de manutenção
   if (EMERGENCY_MODE) {
     if (licenseKey === MAINTENANCE_LICENSE_KEY) {
+      const session = createSession({ licenseKey: MAINTENANCE_LICENSE_KEY, deviceFingerprint, userName: 'Manutenção' });
       return res.status(200).json({
         valid: true,
         message: 'Licença de manutenção ativa.',
+        sessionToken: session.sessionToken,
+        refreshToken: session.refreshToken,
+        expiresAt: session.expiresAt,
         license: { key: MAINTENANCE_LICENSE_KEY, lifetime: true, active: true },
         userData: { lifetime: true }
       });
@@ -96,6 +98,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ valid: false, message: 'Limite de usos atingido' });
     }
 
+    // Verificação de sessão ativa em outro dispositivo
     const activeSession = cloudLicense.activeSession;
     if (activeSession && activeSession.deviceFingerprint !== deviceFingerprint && activeSession.lastPingAt) {
       const lastPing = new Date(activeSession.lastPingAt).getTime();
@@ -106,6 +109,8 @@ module.exports = async function handler(req, res) {
         });
       }
     }
+
+    // Verificação de device binding
     if (cloudLicense.activatedDeviceFingerprint && cloudLicense.activatedDeviceFingerprint !== deviceFingerprint) {
       return res.status(200).json({
         valid: false,
@@ -116,19 +121,28 @@ module.exports = async function handler(req, res) {
     const nowIso = new Date().toISOString();
     const sessionPayload = { deviceFingerprint, lastPingAt: nowIso };
 
+    // Gerar JWT de sessão
+    const jwtSession = createSession({
+      licenseKey,
+      deviceFingerprint,
+      userName: cloudLicense.userName || ''
+    });
+
     if (cloudLicense.activatedDeviceFingerprint === deviceFingerprint) {
-      const updated = await updateLicense(licenseKey, { activeSession: sessionPayload });
-      if (!updated) {
-        return res.status(503).json({ valid: false, message: 'Erro ao atualizar sessão. Tente novamente.' });
-      }
+      // Já ativado neste dispositivo - atualizar sessão
+      await updateLicense(licenseKey, { activeSession: sessionPayload });
       return res.status(200).json({
         valid: true,
         message: 'Licença ativada neste dispositivo. Acesso permanente.',
+        sessionToken: jwtSession.sessionToken,
+        refreshToken: jwtSession.refreshToken,
+        expiresAt: jwtSession.expiresAt,
         license: cloudLicense,
         userData: buildUserData(cloudLicense)
       });
     }
 
+    // Primeira ativação - vincular dispositivo
     const newUses = (cloudLicense.uses || 0) + 1;
     const updateData = {
       activatedDeviceFingerprint: deviceFingerprint,
@@ -145,7 +159,10 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({
       valid: true,
-      message: 'Licença ativada e vinculada a este dispositivo! Você poderá usar indefinidamente.',
+      message: 'Licença ativada e vinculada a este dispositivo!',
+      sessionToken: jwtSession.sessionToken,
+      refreshToken: jwtSession.refreshToken,
+      expiresAt: jwtSession.expiresAt,
       license: { ...cloudLicense, ...updateData },
       userData: buildUserData(cloudLicense)
     });

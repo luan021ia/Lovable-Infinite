@@ -3,11 +3,11 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     // ============================================
-    // VERIFICAÇÃO DE AUTENTICAÇÃO COM LICENÇA
+    // VERIFICAÇÃO DE AUTENTICAÇÃO COM LICENÇA + JWT
     // ============================================
-    const authData = await chrome.storage.local.get(['isAuthenticated', 'licenseKey']);
+    const authData = await chrome.storage.local.get(['isAuthenticated', 'licenseKey', 'sessionToken']);
 
-    if (CONFIG.REQUIRE_LICENSE && (!authData.isAuthenticated || !authData.licenseKey)) {
+    if (CONFIG.REQUIRE_LICENSE && (!authData.isAuthenticated || !authData.licenseKey || !authData.sessionToken)) {
         window.location.href = 'auth.html';
         return;
     }
@@ -143,6 +143,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Executar validação UMA ÚNICA VEZ ao iniciar
     await validateLicenseOnce();
+
+    // ============================================
+    // VERIFICAÇÃO JWT OBRIGATÓRIA
+    // O token é assinado pelo servidor - não pode ser forjado.
+    // Sem JWT válido = sem acesso, mesmo que moque outras respostas.
+    // ============================================
+    const sessionResult = await verifySessionWithServer();
+    if (!sessionResult.valid) {
+        // Tentar renovar o token
+        const refreshed = await tryRefreshSession();
+        if (!refreshed) {
+            // JWT inválido/expirado - forçar novo login
+            await chrome.storage.local.remove([
+                'isAuthenticated', 'licenseKey', 'authTimestamp', 'userData',
+                'lovable_token', 'deviceFingerprint', 'firebaseDatabaseURL',
+                'sessionToken', 'refreshToken', 'sessionExpiresAt'
+            ]);
+            alert('Sessão expirada: ' + (sessionResult.message || 'Faça login novamente.'));
+            window.location.href = 'auth.html';
+            return;
+        }
+    }
 
     // Helper: Update UI when token is found
     function updateTokenDisplay(token) {
@@ -506,7 +528,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!confirm('Deseja sair e desativar a licença neste navegador?')) return;
         await chrome.storage.local.remove([
             'isAuthenticated', 'licenseKey', 'authTimestamp', 'userData',
-            'deviceFingerprint', 'firebaseDatabaseURL', 'lovable_token'
+            'deviceFingerprint', 'firebaseDatabaseURL', 'lovable_token',
+            'sessionToken', 'refreshToken', 'sessionExpiresAt'
         ]);
         window.location.href = 'auth.html';
     });

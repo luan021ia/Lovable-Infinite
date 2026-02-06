@@ -31,6 +31,22 @@
       "memory": 256,
       "maxDuration": 10
     },
+    "api/verifySession.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/refreshSession.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/revokeAllSessions.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "api/getPromptConfig.js": {
+      "memory": 256,
+      "maxDuration": 10
+    },
     "api/publishExtensionRelease.js": {
       "memory": 256,
       "maxDuration": 10

@@ -8,13 +8,13 @@ const CONFIG = {
     REQUIRE_LICENSE: true,
     FIREBASE_URL: 'https://lovable2-e6f7f-default-rtdb.firebaseio.com',
     CACHE_DURATION: 5 * 60 * 1000,
-    // Chave de desenvolvimento: válida por 30 dias
-    DEV_LICENSE_KEY: 'MLI-DEV-30DIAS-TESTE',
-    DEV_LICENSE_DAYS: 30,
     // URL da API do melhorador de prompt (Vercel)
     IMPROVE_PROMPT_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/improvePrompt',
     // URL da API de validação de licença (Vercel) - usa Firebase Admin SDK
-    VALIDATE_LICENSE_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/validateLicense'
+    VALIDATE_LICENSE_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/validateLicense',
+    // Endpoints JWT (sessão segura)
+    VERIFY_SESSION_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/verifySession',
+    REFRESH_SESSION_ENDPOINT: 'https://lovable-infinity-api.vercel.app/api/refreshSession'
 };
 
 let licenseCache = {};
@@ -99,24 +99,6 @@ async function validateKeySecure(key) {
     }
 
     const cleanKey = key.trim();
-
-    // Chave de desenvolvimento (fallback quando API não está disponível)
-    if (CONFIG.DEV_LICENSE_KEY && cleanKey === CONFIG.DEV_LICENSE_KEY) {
-        const stored = await chrome.storage.local.get(['devLicenseFirstUsed']);
-        const now = new Date();
-        let firstUsed = stored.devLicenseFirstUsed ? new Date(stored.devLicenseFirstUsed) : null;
-        if (!firstUsed) {
-            await chrome.storage.local.set({ devLicenseFirstUsed: now.toISOString() });
-            firstUsed = now;
-        }
-        const daysElapsed = (now - firstUsed) / (24 * 60 * 60 * 1000);
-        if (daysElapsed > CONFIG.DEV_LICENSE_DAYS) {
-            return { valid: false, message: 'Chave de desenvolvimento expirada (' + CONFIG.DEV_LICENSE_DAYS + ' dias).' };
-        }
-        const daysLeft = Math.ceil(CONFIG.DEV_LICENSE_DAYS - daysElapsed);
-        return { valid: true, message: 'Modo desenvolvimento (válido por ' + daysLeft + ' dias).', license: {} };
-    }
-
     const deviceFingerprint = await getDeviceFingerprint();
 
     try {
@@ -134,12 +116,16 @@ async function validateKeySecure(key) {
 
         const result = await response.json();
 
-        // A API já retorna no formato { valid, message, license?, userData? }
+        // A API já retorna no formato { valid, message, license?, userData?, sessionToken?, refreshToken?, expiresAt? }
         return {
             valid: result.valid,
             message: result.message,
             license: result.license || null,
-            userData: result.userData || null
+            userData: result.userData || null,
+            // JWT tokens (se o servidor retornar)
+            sessionToken: result.sessionToken || null,
+            refreshToken: result.refreshToken || null,
+            sessionExpiresAt: result.expiresAt || null
         };
 
     } catch (error) {
@@ -192,4 +178,84 @@ async function clearAuthentication() {
 async function initializeConfig() {
     await verifyIntegrity();
     return await isAuthenticated();
+}
+
+// ============================================
+// SESSÃO JWT (camada de segurança extra)
+// Se falhar, a extensão continua funcionando normalmente.
+// ============================================
+
+/**
+ * Verifica a sessão JWT com o servidor
+ */
+async function verifySessionWithServer() {
+    try {
+        const stored = await chrome.storage.local.get(['sessionToken']);
+        if (!stored.sessionToken) return { valid: false, message: 'Sem sessão JWT.' };
+
+        const response = await fetch(CONFIG.VERIFY_SESSION_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + stored.sessionToken
+            }
+        });
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        return { valid: false, message: 'Erro de conexão.' };
+    }
+}
+
+/**
+ * Tenta renovar a sessão usando o refresh token
+ */
+async function tryRefreshSession() {
+    try {
+        const stored = await chrome.storage.local.get(['refreshToken', 'deviceFingerprint']);
+        if (!stored.refreshToken) return false;
+
+        const response = await fetch(CONFIG.REFRESH_SESSION_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                refreshToken: stored.refreshToken,
+                deviceFingerprint: stored.deviceFingerprint || ''
+            })
+        });
+
+        const result = await response.json();
+        if (result.valid && result.sessionToken) {
+            await chrome.storage.local.set({
+                sessionToken: result.sessionToken,
+                refreshToken: result.refreshToken,
+                sessionExpiresAt: result.expiresAt
+            });
+            return true;
+        }
+        return false;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Obter token de sessão atual (verifica expiração e tenta renovar)
+ */
+async function getSessionToken() {
+    const stored = await chrome.storage.local.get(['sessionToken', 'sessionExpiresAt']);
+    if (!stored.sessionToken) return null;
+
+    const now = Date.now();
+    if (stored.sessionExpiresAt && (stored.sessionExpiresAt - now) < 5 * 60 * 1000) {
+        const refreshed = await tryRefreshSession();
+        if (refreshed) {
+            const updated = await chrome.storage.local.get(['sessionToken']);
+            return updated.sessionToken;
+        }
+        return null;
+    }
+
+    return stored.sessionToken;
 }

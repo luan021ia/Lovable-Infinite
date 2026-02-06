@@ -4,7 +4,7 @@
  * Body: { uid, displayName?, password?, validUntil?, disabled? }
  */
 
-const { getAdminAuth, verifyMasterToken, getPanelUser, setPanelUser, parseBody } = require('./lib/firebaseAdmin');
+const { getAdminAuth, verifyMasterToken, getPanelUser, setPanelUser, parseBody } = require('./_lib/firebaseAdmin');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
