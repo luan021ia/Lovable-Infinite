@@ -126,14 +126,23 @@ class LicenseManager {
 
     /**
      * Calcula data de expiração. Se days for null/undefined/-1, retorna data muito futura (vitalício).
+     * A data de expiração é definida para o fim do dia (23:59:59.999 UTC) no dia calculado.
+     * Isso garante consistência com a edição de licenças e evita problemas de timezone.
      */
     getExpiryDate(days) {
         if (days == null || days === -1 || days === 'lifetime') {
             return new Date('9999-12-31T23:59:59.999Z').toISOString();
         }
-        const date = new Date();
-        date.setDate(date.getDate() + days);
-        return date.toISOString();
+        // Usar a data atual em UTC para evitar problemas de timezone
+        const now = new Date();
+        // Calcular a data de expiração somando os dias
+        const expiryDate = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate() + days,
+            23, 59, 59, 999
+        ));
+        return expiryDate.toISOString();
     }
 
     /**

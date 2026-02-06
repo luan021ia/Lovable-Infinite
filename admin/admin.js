@@ -9,18 +9,29 @@ let extensionFilename = 'LOVABLE_INFINITY.zip'; // nome padrão, atualizado via 
 
 const EXPIRING_DAYS = 30;
 
+/**
+ * Verifica se a licença está expirando em breve (próximos 30 dias).
+ * Usa comparação em timestamp (milissegundos desde epoch) para consistência.
+ */
 function isExpiringSoon(license) {
     if (!license.active || license.lifetime) return false;
-    const now = new Date();
-    const expiry = new Date(license.expiryDate);
-    if (now > expiry) return false;
-    const limit = new Date(now);
-    limit.setDate(limit.getDate() + EXPIRING_DAYS);
-    return expiry <= limit;
+    const nowMs = Date.now();
+    const expiryMs = Date.parse(license.expiryDate);
+    if (isNaN(expiryMs)) return false;
+    if (nowMs > expiryMs) return false;
+    const limitMs = nowMs + (EXPIRING_DAYS * 24 * 60 * 60 * 1000);
+    return expiryMs <= limitMs;
 }
 
+/**
+ * Verifica se a licença está expirada.
+ * Usa comparação em timestamp para evitar problemas de timezone.
+ */
 function isExpired(license) {
-    return new Date(license.expiryDate) < new Date();
+    if (license.lifetime) return false;
+    const expiryMs = Date.parse(license.expiryDate);
+    if (isNaN(expiryMs)) return false;
+    return Date.now() > expiryMs;
 }
 
 function getCurrentUser() {
@@ -179,6 +190,27 @@ function setupEventListeners() {
     document.getElementById('btn-export')?.addEventListener('click', exportLicenses);
     document.getElementById('btn-copy-export')?.addEventListener('click', copyExport);
     document.getElementById('btn-import')?.addEventListener('click', importLicenses);
+
+    // Pesquisa de licenças
+    const searchInput = document.getElementById('search-licenses');
+    const btnClearSearch = document.getElementById('btn-clear-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            filterAndRenderLicenses(searchInput.value);
+        });
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                filterAndRenderLicenses('');
+            }
+        });
+    }
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            filterAndRenderLicenses('');
+        });
+    }
     document.getElementById('btn-toggle-import-export')?.addEventListener('click', () => {
         const body = document.getElementById('import-export-body');
         const btn = document.getElementById('btn-toggle-import-export');
@@ -282,15 +314,21 @@ async function checkExtensionRelease() {
 }
 
 async function createPanelUserSubmit() {
+    var nameEl = document.getElementById('panel-user-name');
     var emailEl = document.getElementById('panel-user-email');
     var passEl = document.getElementById('panel-user-password');
     var confirmEl = document.getElementById('panel-user-password-confirm');
     var errEl = document.getElementById('panel-user-error');
     var btn = document.getElementById('btn-create-panel-user');
+    var displayName = (nameEl && nameEl.value || '').trim();
     var email = (emailEl && emailEl.value || '').trim().toLowerCase();
     var password = (passEl && passEl.value) || '';
     var passwordConfirm = (confirmEl && confirmEl.value) || '';
     if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (!displayName) {
+        if (errEl) { errEl.textContent = 'Informe o nome do usuário.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
+        return;
+    }
     if (!email) {
         if (errEl) { errEl.textContent = 'Informe o e-mail.'; errEl.style.display = 'block'; errEl.classList.add('alert-error'); }
         return;
@@ -318,11 +356,12 @@ async function createPanelUserSubmit() {
         var res = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ email: email, password: password })
+            body: JSON.stringify({ email: email, password: password, displayName: displayName })
         });
         var data = await res.json().catch(function () { return {}; });
         if (res.ok && data.success) {
             showAlert('Acesso criado. O usuário já pode entrar com esse e-mail e senha.', 'success');
+            if (nameEl) nameEl.value = '';
             if (emailEl) emailEl.value = '';
             if (passEl) passEl.value = '';
             if (confirmEl) confirmEl.value = '';
@@ -366,6 +405,27 @@ async function loadMain() {
     attachTableButtonListeners();
 }
 
+/**
+ * Filtra e renderiza as licenças com base no termo de pesquisa.
+ * Pesquisa por nome do usuário ou chave da licença.
+ */
+function filterAndRenderLicenses(searchTerm) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        renderTable(allLicensesCache);
+        return;
+    }
+    
+    const term = searchTerm.trim().toLowerCase();
+    const filtered = allLicensesCache.filter(license => {
+        const name = (license.userName || '').toLowerCase();
+        const key = (license.key || '').toLowerCase();
+        const phone = (license.userPhone || '').toLowerCase();
+        return name.includes(term) || key.includes(term) || phone.includes(term);
+    });
+    
+    renderTable(filtered);
+}
+
 function renderTable(licenses) {
     const tbody = document.getElementById('licenses-tbody');
     if (!tbody) return;
@@ -380,7 +440,14 @@ function renderTable(licenses) {
             statusText = isExpired(license) ? 'Expirada' : (isExpiringSoon(license) ? 'Expirando' : 'Ativa');
         }
         const activatedText = license.activated ? 'Sim' : 'Não';
-        const expiryDisplay = license.lifetime ? 'Vitalício' : new Date(license.expiryDate).toLocaleDateString('pt-BR');
+        // Formatar data de expiração corretamente, extraindo apenas a parte da data da ISO string
+        let expiryDisplay = 'Vitalício';
+        if (!license.lifetime && license.expiryDate) {
+            // Extrair a data da string ISO (YYYY-MM-DD) para evitar problemas de timezone
+            const isoDate = license.expiryDate.substring(0, 10);
+            const [year, month, day] = isoDate.split('-');
+            expiryDisplay = `${day}/${month}/${year}`;
+        }
 
         tr.innerHTML = `
             <td><div class="license-key">${escapeHtml(license.key)}</div></td>
@@ -510,8 +577,12 @@ async function openEditModal(key) {
         expiryGroup.style.display = 'none';
     } else {
         expiryGroup.style.display = 'block';
-        const d = new Date(license.expiryDate);
-        expiryInput.value = d.toISOString().slice(0, 10);
+        // Extrair a data diretamente da string ISO para evitar problemas de timezone
+        if (license.expiryDate) {
+            expiryInput.value = license.expiryDate.substring(0, 10);
+        } else {
+            expiryInput.value = '';
+        }
     }
     document.getElementById('edit-max-uses').value = license.maxUses != null && license.maxUses !== '' ? String(license.maxUses) : '';
     document.getElementById('modal-edit').classList.add('show');
@@ -658,33 +729,71 @@ function confirmAction() {
 // ==================== GERENCIAMENTO DE USUÁRIOS DO PAINEL ====================
 
 let panelUsersCache = [];
+let licensesCountByOwner = {}; // Contagem de licenças ativas por ownerId
+
+/**
+ * Busca todas as licenças do Firebase e conta por ownerId.
+ * Retorna um objeto { ownerId: { total, active } }
+ */
+async function fetchLicensesCountByOwner() {
+    try {
+        if (typeof firebaseRequest !== 'function') return {};
+        const result = await firebaseRequest('/licenses');
+        if (!result || typeof result !== 'object') return {};
+        
+        const counts = {};
+        Object.values(result).forEach(license => {
+            if (!license || !license.ownerId) return;
+            const ownerId = license.ownerId;
+            if (!counts[ownerId]) {
+                counts[ownerId] = { total: 0, active: 0 };
+            }
+            counts[ownerId].total++;
+            // Contar como ativa se active === true e não estiver expirada
+            if (license.active && !isExpired(license)) {
+                counts[ownerId].active++;
+            }
+        });
+        return counts;
+    } catch (e) {
+        console.error('[fetchLicensesCountByOwner] Erro:', e);
+        return {};
+    }
+}
 
 async function loadPanelUsers() {
     const tbody = document.getElementById('panel-users-tbody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">Carregando...</td></tr>';
 
     var apiUrl = typeof LIST_PANEL_USERS_API_URL !== 'undefined' ? LIST_PANEL_USERS_API_URL : '';
     if (!apiUrl || !currentUser) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 24px;">Configure LIST_PANEL_USERS_API_URL ou faça login.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #fca5a5; padding: 24px;">Configure LIST_PANEL_USERS_API_URL ou faça login.</td></tr>';
         return;
     }
 
     try {
+        // Buscar usuários e contagem de licenças em paralelo
         var token = await currentUser.getIdToken();
-        var res = await fetch(apiUrl, {
-            method: 'GET',
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        var data = await res.json().catch(function () { return {}; });
-        if (!res.ok || !data.success) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 24px;">' + escapeHtml(data.error || 'Erro ao carregar usuários.') + '</td></tr>';
+        var [usersRes, licenseCounts] = await Promise.all([
+            fetch(apiUrl, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token }
+            }),
+            fetchLicensesCountByOwner()
+        ]);
+        
+        var data = await usersRes.json().catch(function () { return {}; });
+        if (!usersRes.ok || !data.success) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #fca5a5; padding: 24px;">' + escapeHtml(data.error || 'Erro ao carregar usuários.') + '</td></tr>';
             return;
         }
+        
         panelUsersCache = data.users || [];
+        licensesCountByOwner = licenseCounts;
         renderPanelUsersTable(panelUsersCache);
     } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #fca5a5; padding: 24px;">Erro de conexão.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #fca5a5; padding: 24px;">Erro de conexão.</td></tr>';
     }
 }
 
@@ -694,7 +803,7 @@ function renderPanelUsersTable(users) {
     tbody.innerHTML = '';
 
     if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">Nenhum usuário cadastrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">Nenhum usuário cadastrado.</td></tr>';
         return;
     }
 
@@ -704,21 +813,26 @@ function renderPanelUsersTable(users) {
         const validUntil = user.validUntil;
         const isLifetime = validUntil === -1 || validUntil === '-1' || validUntil === null || validUntil === undefined;
         let validityText = 'Vitalício';
-        let isExpired = false;
+        let isUserExpired = false;
         if (!isLifetime && validUntil) {
             const expDate = new Date(Number(validUntil));
             if (!isNaN(expDate.getTime())) {
                 validityText = expDate.toLocaleDateString('pt-BR');
-                isExpired = expDate < new Date();
+                isUserExpired = expDate < new Date();
             }
         }
-        const statusClass = isDisabled ? 'status-inactive' : (isExpired ? 'status-expiring' : 'status-active');
-        const statusText = isDisabled ? 'Desativado' : (isExpired ? 'Expirado' : 'Ativo');
+        const statusClass = isDisabled ? 'status-inactive' : (isUserExpired ? 'status-expiring' : 'status-active');
+        const statusText = isDisabled ? 'Desativado' : (isUserExpired ? 'Expirado' : 'Ativo');
         const createdAt = user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : '—';
+        
+        // Buscar contagem de licenças deste usuário
+        const licenseStats = licensesCountByOwner[user.uid] || { total: 0, active: 0 };
+        const licensesDisplay = `${licenseStats.active} / ${licenseStats.total}`;
 
         tr.innerHTML = `
             <td><div class="license-key" style="font-size: 12px;">${escapeHtml(user.email || '—')}</div></td>
             <td>${escapeHtml(user.displayName || '—')}</td>
+            <td><span class="status-badge-small status-active" style="background: rgba(96,165,250,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.4);" title="Ativas / Total">${licensesDisplay}</span></td>
             <td><span class="status-badge-small ${statusClass}">${statusText}</span></td>
             <td>${validityText}</td>
             <td>${createdAt}</td>

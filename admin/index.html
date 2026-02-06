@@ -67,9 +67,9 @@
         .modal-content { position: relative; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 28px; max-width: 440px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 30px rgba(96,165,250,0.1); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
         .modal-content::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom right, rgba(96,165,250,0.05), transparent, rgba(6,182,212,0.05)); pointer-events: none; border-radius: 24px; }
         .modal-content.modal-edit { max-width: 500px; }
-        .modal-header { font-size: 18px; font-weight: 600; color: #ffffff; margin-bottom: 20px; padding-right: 32px; letter-spacing: -0.01em; position: relative; }
-        .modal-close { position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: #9ca3af; font-size: 20px; cursor: pointer; line-height: 1; padding: 8px; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px; transition: color 0.2s, background 0.2s; }
-        .modal-close:hover { color: #ffffff; background: rgba(255,255,255,0.1); }
+        .modal-header { font-size: 18px; font-weight: 600; color: #ffffff; margin-bottom: 20px; padding-right: 40px; letter-spacing: -0.01em; position: relative; }
+        .modal-close { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 22px; cursor: pointer; line-height: 1; padding: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: all 0.2s; z-index: 10; }
+        .modal-close:hover { color: #ffffff; background: rgba(255,255,255,0.15); border-color: rgba(96,165,250,0.3); transform: scale(1.05); }
         .import-export-toggle { margin-bottom: 0; }
         .import-export-body { display: none; padding-top: 20px; margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
         .import-export-body.show { display: block; }
@@ -171,6 +171,13 @@
         <div class="stats-grid" id="stats-grid"></div>
 
         <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px; flex-wrap: wrap;">
+                <h2 style="margin: 0; font-size: 15px;">Licenças cadastradas</h2>
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1; max-width: 400px;">
+                    <input type="text" id="search-licenses" placeholder="Pesquisar por nome ou chave..." style="flex: 1; padding: 10px 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: #ffffff; font-size: 14px;">
+                    <button type="button" class="btn btn-secondary" id="btn-clear-search" style="padding: 10px 14px; white-space: nowrap;">Limpar</button>
+                </div>
+            </div>
             <div class="admin-table-wrap">
                 <table class="license-table">
                     <thead>
@@ -224,6 +231,7 @@
                         <tr>
                             <th>E-mail</th>
                             <th>Nome</th>
+                            <th>Licenças ativas</th>
                             <th>Status</th>
                             <th>Validade</th>
                             <th>Criado em</th>
@@ -231,7 +239,7 @@
                         </tr>
                     </thead>
                     <tbody id="panel-users-tbody">
-                        <tr><td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">Carregando...</td></tr>
+                        <tr><td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -241,6 +249,10 @@
         <div class="section">
             <h2>Criar novo acesso ao painel</h2>
             <p style="color: #94a3b8; margin-bottom: 20px;">Cadastre um usuário para acessar o painel com e-mail e senha. Cada usuário terá seu próprio ambiente de licenças.</p>
+            <div class="form-group">
+                <label for="panel-user-name">Nome do usuário</label>
+                <input type="text" id="panel-user-name" placeholder="Ex: João Silva" autocomplete="off">
+            </div>
             <div class="form-group">
                 <label for="panel-user-email">E-mail do novo usuário</label>
                 <input type="email" id="panel-user-email" placeholder="email@exemplo.com" autocomplete="off">
